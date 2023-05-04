@@ -15,9 +15,6 @@ jobs:
         with:
           node-version: 18.x
 
-      - name: Go to Docs Folder
-        run: cd apps/docs
-
       - name: Setup Pnpm
         run: sudo corepack enable
       - name: Install dependencies
