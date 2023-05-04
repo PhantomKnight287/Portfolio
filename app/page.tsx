@@ -1,116 +1,142 @@
-import Image from 'next/image'
-import { Inter } from 'next/font/google'
+import Transition from "@/components/transition";
+import Image from "next/image";
+import Link from "next/link";
+import { AiOutlineRight, AiOutlineMail } from "react-icons/ai";
+import { FiGithub } from "react-icons/fi";
+import styles from "./page.module.css";
+import clsx from "clsx";
+import { Projects } from "@/constants";
 
-const inter = Inter({ subsets: ['latin'] })
+export const metadata = {
+  title: "Gurpal Singh | PhantomKnight287",
+  description: "I am a Full Stack Web Developer from India.",
+  openGraph: {
+    title: "Gurpal Singh | PhantomKnight287",
+    description: "I am a Full Stack Web Developer from India.",
+    // @ts-ignore
+    type: "website",
+    url: "https://phantomknight287.github.io/",
+    site_name: "Gurpal Singh | PhantomKnight287",
+    images: [
+      {
+        url: "https://avatars.githubusercontent.com/u/76196237",
+        width: 50,
+        height: 50,
+        alt: "PhantomKnight287",
+      },
+    ],
+  },
+  twitter: {
+    site: "@PhantomKnight287",
+    title: "Gurpal Singh | PhantomKnight287",
+    description: "I am a Full Stack Web Developer from India.",
+    card: "summary_large_image",
+    creator: "gurpalsingh287",
+    images: [
+      {
+        url: "https://avatars.githubusercontent.com/u/76196237",
+        width: 50,
+        height: 50,
+      },
+    ],
+  },
+};
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <main className="min-h-screen pt-10 container items-center justify-center flex-col">
+      <div className="content-center items-center flex flex-none flex-col flex-nowrap gap-2.5 h-min justify-center overflow-visible relative w-full px-4 py-0">
+        <div className="container max-w-[512px] flex flex-row">
+          <Image
+            src="https://avatars.githubusercontent.com/u/76196237"
+            alt="PhantomKnigh287"
+            width={44}
+            height={44}
+            className="rounded-full"
+          />
+          <div className="flex flex-col ml-2">
+            <h1 className="text-base font-bold text-white">Gurpal Singh</h1>
+            <span className="text-sm text-gray-400">@PhantomKnight287</span>
+          </div>
         </div>
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://beta.nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
+      <div className="flex mt-10 flex-col max-w-[512px] mx-auto p-5 lg:p-0">
+        <div className="container">
+          <h1 className="text-xl font-bold text-gray-400">
+            I make
+            <Transition />
+          </h1>
+          <p className="mt-5 text-xl text-gray-400">
+            I&apos;m Gurpal Singh, an 18 year old developer living in India. I
+            am a self-taught developer who loves to code and make things.
           </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
+        </div>
+        <div className="flex items-start mt-5 w-full justify-start flex-col">
+          <div className="flex flex-row items-center justify-start">
+            <div className="aspect-square flex-none h-[10px] overflow-hidden relative w-2.5 will-change-transform bg-green-500 rounded-full"></div>
+            <div className="flex flex-col justify-start shrink-0 opacity-100 ml-2 ">
+              <p className="text-white">Available for new opportunities</p>
+            </div>
+          </div>
+          <br />
+          <div className="flex flex-row mt-3 gap-3">
+            <a
+              href="https://github.com/phantomknight287"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-row items-center justify-start gap-2.5 
+              text-gray-400 hover:text-gray-300 transition duration-300 ease-in-out
+              bg-gray-800 hover:bg-gray-700 rounded-md px-3 py-2.5  
+            "
+            >
+              <FiGithub className="text-gray-400 text-xl" />
+            </a>
+            <a
+              href="mailto:phantomknight287@proton.me"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-row items-center justify-start gap-2.5 
+              text-gray-400 hover:text-gray-300 transition duration-300 ease-in-out
+              bg-gray-800 hover:bg-gray-700 rounded-md px-3 py-2.5  
+            "
+            >
+              <AiOutlineMail className="text-gray-400 text-xl" />
+            </a>
+          </div>
+        </div>
+        <div className="w-full h-[1px] "></div>
+        <div className="mt-5">
+          <h1 className="text-2xl text-white mt-5">Projects</h1>
+          <div className="flex flex-col">
+            {Projects.map((project) => (
+              <a
+                key={project.name.replace(" ", "-")}
+                href={project.href}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <article
+                  className={clsx(
+                    "flex flex-row gap-3 items-center justify-between lg:justify-center mt-3 mb-3 w-full",
+                    styles.article
+                  )}
+                >
+                  <div className="flex flex-col justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto;">
+                    <h1 className="text-lg font-medium leading-[1.3em] text-left text-gray-300 ">
+                      {project.name}
+                    </h1>
+                  </div>
+                  <div className="w-full h-[1px] bg-gray-700 transition-all duration-[110ms] hidden lg:block"></div>
+                  <AiOutlineRight
+                    className="text-gray-400 transition-all duration-[110ms]"
+                    size={20}
+                  />
+                </article>
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
     </main>
-  )
+  );
 }

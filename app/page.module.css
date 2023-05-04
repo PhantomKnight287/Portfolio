@@ -1,0 +1,6 @@
+.article:hover > div:nth-child(2) {
+  @apply bg-white;
+}
+.article:hover > svg {
+  @apply text-white;
+}
