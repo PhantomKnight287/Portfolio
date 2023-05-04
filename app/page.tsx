@@ -1,5 +1,4 @@
 import Transition from "@/components/transition";
-import Image from "next/image";
 import Link from "next/link";
 import { AiOutlineRight, AiOutlineMail } from "react-icons/ai";
 import { FiGithub } from "react-icons/fi";
@@ -47,7 +46,7 @@ export default function Home() {
     <main className="min-h-screen pt-10 container items-center justify-center flex-col">
       <div className="content-center items-center flex flex-none flex-col flex-nowrap gap-2.5 h-min justify-center overflow-visible relative w-full px-4 py-0">
         <div className="container max-w-[512px] flex flex-row">
-          <Image
+          <img
             src="https://avatars.githubusercontent.com/u/76196237"
             alt="PhantomKnigh287"
             width={44}
