@@ -105,10 +105,11 @@ export default function Home() {
         </div>
         <div className="w-full h-[1px] "></div>
         <div className="mt-5">
-          <h1 className="text-2xl text-white mt-5">Projects</h1>
+          <h1 className="text-2xl text-white mt-5 mb-5">Projects</h1>
           <div className="flex flex-col">
             {Projects.map((project) => (
               <a
+                className={styles.proj}
                 key={project.name.replace(" ", "-")}
                 href={project.href}
                 target="_blank"
@@ -116,16 +117,16 @@ export default function Home() {
               >
                 <article
                   className={clsx(
-                    "flex flex-row gap-3 items-center justify-between lg:justify-center mt-3 mb-3 w-full",
+                    "flex flex-row gap-0 items-center justify-between lg:justify-center mt-3 mb-3 w-full",
                     styles.article
                   )}
                 >
-                  <div className="flex flex-col justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto;">
+                  <div className="flex flex-col justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto; mr-3">
                     <h1 className="text-lg font-medium leading-[1.3em] text-left text-gray-300 ">
                       {project.name}
                     </h1>
                   </div>
-                  <div className="w-full h-[1px] bg-gray-700 transition-all duration-[110ms] hidden lg:block"></div>
+                  <div className={styles.projLine}></div>
                   <AiOutlineRight
                     className="text-gray-400 transition-all duration-[110ms]"
                     size={20}
