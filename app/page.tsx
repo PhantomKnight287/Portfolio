@@ -7,19 +7,19 @@ import Image from "next/image";
 
 export const metadata = {
   title: "Gurpal Singh | PhantomKnight287",
-  description: "I am a Full Stack Web Developer from India.",
+  description: "I am a Full Stack Web and App Developer from India.",
   openGraph: {
     title: "Gurpal Singh | PhantomKnight287",
-    description: "I am a Full Stack Web Developer from India.",
+    description: "I am a Full Stack Web and App Developer from India.",
     // @ts-ignore
     type: "website",
     url: "https://phantomknight287.github.io/",
     site_name: "Gurpal Singh | PhantomKnight287",
     images: [
       {
-        url: "https://avatars.githubusercontent.com/u/76196237",
-        width: 50,
-        height: 50,
+        url: "https://github.com/phantomknight287.png",
+        width: 200,
+        height: 200,
         alt: "PhantomKnight287",
       },
     ],
@@ -27,14 +27,14 @@ export const metadata = {
   twitter: {
     site: "@PhantomKnight287",
     title: "Gurpal Singh | PhantomKnight287",
-    description: "I am a Full Stack Web Developer from India.",
+    description: "I am a Full Stack Web and App Developer from India.",
     card: "summary_large_image",
     creator: "gurpalsingh287",
     images: [
       {
-        url: "https://avatars.githubusercontent.com/u/76196237",
-        width: 50,
-        height: 50,
+        url: "https://github.com/phantomknight287.png",
+        width: 200,
+        height: 200,
       },
     ],
   },
@@ -46,7 +46,7 @@ export default function Home() {
       <div className="content-center items-center flex flex-none flex-col flex-nowrap gap-2.5 h-min justify-center overflow-visible relative w-full px-4 py-0">
         <div className="container max-w-[512px] flex flex-row">
           <Image
-            src="https://avatars.githubusercontent.com/u/76196237"
+            src="https://github.com/phantomknight287.png"
             alt="PhantomKnigh287"
             width={44}
             height={44}
