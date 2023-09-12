@@ -121,7 +121,7 @@ export default function Home() {
 											{project.name}
 										</h1>
 									</div>
-									<div className="w-full border-0.5 border-gray-600 rounded-2 transition duration-110 opacity-80 group-hover:border-white"></div>
+									<div className="w-full border-t border-gray-700 rounded-2 transition duration-110 opacity-80 group-hover:border-white"></div>
 									<AiOutlineRight
 										className="text-gray-400 transition-all duration-[110ms] group-hover:text-white"
 										size={20}
