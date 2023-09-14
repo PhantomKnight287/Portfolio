@@ -49,15 +49,16 @@ async function ProjectPage(props: Props) {
     (p) => encodeURIComponent(p.slug) === encodeURIComponent(props.params.name)
   )!;
   return (
-    <div className="min-h-screen lg:pt-20 pt-10 container items-center justify-center flex-col lg:max-w-xl">
+    <div className="min-h-screen lg:pt-20 lg:p-0 p-5 container items-center justify-center flex-col lg:max-w-xl overflow-hidden">
       <BackButton />
-      <Image
-        className="max-w-[850px] max-h-[450px] mx-auto rounded-md mt-5"
-        src={project.image?.url}
-        alt={project.image?.alt}
-        width={project.image?.width}
-        height={project.image?.height}
-      />
+      <div className="w-full image__container">
+        <Image
+          className="mx-auto rounded-md mt-5 object-cover w-full h-[unset]"
+          src={project.image?.url}
+          alt={project.image?.alt}
+          fill
+        />
+      </div>
       {project.image.source ? (
         <p className="text-center text-gray-400">
           Source: {project.image.source}
