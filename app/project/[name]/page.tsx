@@ -7,7 +7,7 @@ import { FiExternalLink, FiGithub } from "react-icons/fi";
 
 export async function generateStaticParams() {
   return Projects.map((p) => ({
-    name: encodeURIComponent(p.name),
+    name: encodeURIComponent(p.slug),
   }));
 }
 interface Props {
@@ -17,7 +17,9 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const project = Projects.find((p) => p.slug === params.name)!;
+  const project = Projects.find(
+    (p) => encodeURIComponent(p.slug) === encodeURIComponent(params.name)
+  )!;
 
   return {
     title: project.name,
@@ -43,7 +45,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 async function ProjectPage(props: Props) {
-  const project = Projects.find((p) => p.slug === props.params.name)!;
+  const project = Projects.find(
+    (p) => encodeURIComponent(p.slug) === encodeURIComponent(props.params.name)
+  )!;
   return (
     <div className="min-h-screen lg:pt-20 pt-10 container items-center justify-center flex-col lg:max-w-xl">
       <BackButton />
@@ -55,7 +59,9 @@ async function ProjectPage(props: Props) {
         height={project.image?.height}
       />
       {project.image.source ? (
-        <p className="text-center text-gray-400">Source: {project.image.source}</p>
+        <p className="text-center text-gray-400">
+          Source: {project.image.source}
+        </p>
       ) : null}
       <div className="flex flex-row items-center my-5">
         <h1 className="text-2xl font-bold text-left">{project.name}</h1>
