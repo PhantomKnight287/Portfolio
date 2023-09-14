@@ -4,6 +4,7 @@ import { FiGithub } from "react-icons/fi";
 import { Projects } from "@/constants";
 import Badge from "@/components/badge";
 import Image from "next/image";
+import Link from "next/link";
 
 export const metadata = {
   title: "Gurpal Singh | PhantomKnight287",
@@ -69,7 +70,7 @@ export default function Home() {
             am a self-taught developer who loves to code and make things.
           </p>
           <p className="mt-5 text-xl text-gray-400">
-            Currently working in a startup and messing with
+            Currently working in a startup and messing with{" "}
             <Badge href="https://nextjs.org">
               <svg
                 width="14"
@@ -138,7 +139,7 @@ export default function Home() {
               </svg>
               Next.js
             </Badge>
-            ,
+            ,{" "}
             <Badge href="https://nestjs.com">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -166,7 +167,7 @@ export default function Home() {
               </svg>
               Nest.js
             </Badge>
-            ,
+            ,{" "}
             <Badge href="https://www.prisma.io/" className="mr-1">
               <svg
                 width="14"
@@ -185,7 +186,7 @@ export default function Home() {
               </svg>
               Prisma
             </Badge>
-            ,
+            ,{" "}
             <Badge href="https://turbo.build/repo" className="ml-10">
               <svg
                 className={"inline-block mr-1"}
@@ -282,12 +283,10 @@ export default function Home() {
           <h1 className="text-2xl text-white mt-5 mb-5">Projects</h1>
           <div className="flex flex-col">
             {Projects.map((project) => (
-              <a
+              <Link
                 className="proj group"
                 key={project.name.replace(" ", "-")}
-                href={project.href}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/project/${project.slug}`}
               >
                 <article className="flex flex-row gap-0 items-center justify-between lg:justify-center mt-3 mb-3 w-full">
                   <div className="flex flex-col justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto mr-3">
@@ -301,7 +300,7 @@ export default function Home() {
                     size={20}
                   />
                 </article>
-              </a>
+              </Link>
             ))}
           </div>
         </div>
