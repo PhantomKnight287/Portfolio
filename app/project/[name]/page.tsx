@@ -1,3 +1,4 @@
+import ImageWithLoader from "@/components/loadingimage";
 import BackButton from "@/components/shared/back";
 import { Projects } from "@/constants";
 import { upperFirst } from "@/utils/uppercase";
@@ -52,7 +53,7 @@ async function ProjectPage(props: Props) {
     <div className="min-h-screen lg:pt-20 lg:p-0 p-5 container items-center justify-center flex-col lg:max-w-xl overflow-hidden">
       <BackButton />
 
-      <Image
+      <ImageWithLoader
         className="mx-auto rounded-md mt-5 object-cover w-full h-[unset]"
         src={project.image.url}
         alt={project.image.alt}
