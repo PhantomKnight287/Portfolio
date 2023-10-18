@@ -196,8 +196,6 @@ export default function Home() {
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
-                <title>Turborepo</title>
-
                 <defs>
                   <linearGradient
                     id="logo-ring-gradient"
@@ -241,7 +239,7 @@ export default function Home() {
                 </g>
               </svg>
               TurboRepo
-            </Badge>
+            </Badge>{" "}
             and some other tooling.
           </p>
         </div>
