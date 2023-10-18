@@ -51,14 +51,16 @@ async function ProjectPage(props: Props) {
   return (
     <div className="min-h-screen lg:pt-20 lg:p-0 p-5 container items-center justify-center flex-col lg:max-w-xl overflow-hidden">
       <BackButton />
-      <div className="w-full image__container">
-        <Image
-          className="mx-auto rounded-md mt-5 object-cover w-full h-[unset]"
-          src={project.image?.url}
-          alt={project.image?.alt}
-          fill
-        />
-      </div>
+
+      <Image
+        className="mx-auto rounded-md mt-5 object-cover w-full h-[unset]"
+        src={project.image.url}
+        alt={project.image.alt}
+        loading="eager"
+        width={project.image.width}
+        height={project.image.height}
+      />
+
       {project.image.source ? (
         <p className="text-center text-gray-400">
           Source: {project.image.source}
