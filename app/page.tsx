@@ -70,7 +70,7 @@ export default function Home() {
             am a self-taught developer who loves to code and make things.
           </p>
           <p className="mt-5 text-xl text-gray-400">
-            Currently working in a startup and messing with{" "}
+            Currently working in a company and messing with{" "}
             <Badge href="https://nextjs.org">
               <svg
                 width="14"
