@@ -19,6 +19,30 @@ interface Project {
 
 export const Projects: Project[] = [
   {
+    name: "Music.ai",
+    slug: "music-ai",
+    image: {
+      url: "/music-ai.jpg",
+      width: 674,
+      height: 441,
+      alt: "Music.ai",
+    },
+    description:
+      "A revolutionary product that brings your music to life with advanced AI technology.",
+    urls: {
+      liveUrl: "https://musicaicentral.com",
+    },
+    tags: [
+      "React Native",
+      "Expo Router",
+      "Typescript",
+      "Nest.js",
+      "PostgreSQL",
+      "Supabase",
+      "In app purchases",
+    ],
+  },
+  {
     name: "Lend My Skill",
     slug: "lend-my-skill",
     image: {
