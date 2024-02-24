@@ -19,6 +19,22 @@ interface Project {
 
 export const Projects: Project[] = [
   {
+    name: "FrameGround",
+    slug: "frameground",
+    image: {
+      url: "/frameground.png",
+      width: 1418,
+      height: 414,
+      alt: "Frameground",
+    },
+    urls: {
+      githubUrl: "https://github.com/phantomknight287/frameground",
+      liveUrl: "https://frameground.tech",
+    },
+    description: "Learn JavaScript frameworks with interactive challenges",
+    tags: ["Next.js", "Typescript", "Tailwind CSS", "Prisma", "PostgreSQL"],
+  },
+  {
     name: "Lend My Skill",
     slug: "lend-my-skill",
     image: {
@@ -66,22 +82,6 @@ export const Projects: Project[] = [
       "Mantine",
       "Chart.js",
     ],
-  },
-  {
-    name: "PhantomKnight",
-    slug: "phantomknight",
-    urls: {
-      githubUrl: "https://github.com/PhantomKnight287/phantomknight",
-    },
-    image: {
-      url: "/phantomknight.jpg",
-      alt: "PhantomKnight",
-      width: 520,
-      height: 360,
-      source: "Unsplash.com",
-    },
-    description: `A discord bot built using discord.js and TypeScript.`,
-    tags: ["TypeScript", "Discord.js", "Node.js"],
   },
   {
     name: "Fluxt",

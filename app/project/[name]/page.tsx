@@ -3,7 +3,6 @@ import BackButton from "@/components/shared/back";
 import { Projects } from "@/constants";
 import { upperFirst } from "@/utils/uppercase";
 import { Metadata } from "next";
-import Image from "next/image";
 import { FiExternalLink, FiGithub } from "react-icons/fi";
 
 export async function generateStaticParams() {
@@ -69,7 +68,7 @@ async function ProjectPage(props: Props) {
       ) : null}
       <div className="flex flex-row items-center my-5">
         <h1 className="text-2xl font-bold text-left">{project.name}</h1>
-        <div className="flex flex-row items-center flex-nowrap ml-auto">
+        <div className="flex flex-row items-center flex-nowrap ml-auto gap-2">
           {Object.keys(project.urls).map((key: keyof typeof project.urls) => (
             <a
               href={project.urls[key]}
