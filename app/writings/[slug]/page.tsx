@@ -32,8 +32,8 @@ export default async function Page(props: { params: { slug: string } }) {
   if (!post) return notFound();
   return (
     <main className="min-h-screen container items-center justify-center flex-col">
-      <div className="flex flex-col max-w-[512px] mx-auto p-5 lg:p-0">
-        <div className="container prose prose-invert prose-lg mt-5">
+      <div className="flex flex-col max-w-[600px] mx-auto p-5 lg:p-0">
+        <div className="container prose prose-invert prose-lg my-5">
           <h1 className="text-xl font-bold">{post.title}</h1>
           <p className="text-base text-gray-400 mb-10">{post.summary}</p>
           <MDXContent

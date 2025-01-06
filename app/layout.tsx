@@ -13,7 +13,7 @@ export default function RootLayout({
       <body className={`${font.className} bg-[#0A0A0A] flex justify-center`}>
         <main className="min-h-screen pt-10 container items-center justify-center flex-col">
           <div className="content-center items-center flex flex-none flex-col flex-nowrap gap-2.5 h-min justify-center overflow-visible relative w-full px-4 py-0">
-            <div className="container max-w-[512px] flex flex-row">
+            <div className="container max-w-[600px] flex flex-row">
               <Link href="/">
                 <Image
                   src="https://github.com/phantomknight287.png"
