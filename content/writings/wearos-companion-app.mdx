@@ -17,6 +17,8 @@ Open your android project in Android Studio (open the `android` folder if using 
 
 ## Phone App Setup
 
+First we need to create a service which will listen to messages from the watch and then we need to tell our phone about the service.
+
 ### Adding Dependencies
 
 Add the following to your app level gradle file (`app/build.gradle`):
@@ -24,6 +26,8 @@ Add the following to your app level gradle file (`app/build.gradle`):
 ```kotlin
 implementation("com.google.android.gms:play-services-wearable:19.0.0")
 ```
+
+The dependency is needed to create the service.
 
 ### Permissions Setup
 
@@ -33,9 +37,11 @@ Add the following code in the `manifest` block of `AndroidManifest.xml`:
 <uses-permission android:name="com.google.android.wearable.permission.BIND_WEARABLE_LISTENER" />
 ```
 
+We need `BIND_WEARABLE_LISTENER` permission to bind a service. We don't need to prompt user to allow this permission.
+
 ### Creating Message Receiver
 
-Create a new file `WearMessageReceiver.kt` in the same folder as `MainActivity.kt`:
+Create a new file `WearMessageReceiver.kt`:
 
 ```kotlin
 package com.your.package
@@ -59,9 +65,11 @@ class WearMessageReceiver : WearableListenerService() {
 }
 ```
 
+This service will run in background(even when the app is killed) and listen to `/open` from your watch. When it receives the message, it will open the app.
+
 ### Registering the Service
 
-Add the following code in the `application` block of `AndroidManifest.xml`:
+Now we need to tell android about this service. Add the following code in the `application` block of `AndroidManifest.xml`:
 
 ```xml
 <service
@@ -78,9 +86,13 @@ Add the following code in the `application` block of `AndroidManifest.xml`:
 </service>
 ```
 
+This code tells android when to invoke the `WearMessageReceiver` service. Make sure `[package name]` is replaced with your package name.
+
 ### Message Sending Function
 
-Add this function to `MainActivity.kt`:
+Now we need a function to send messages from the phone to the watch.
+
+Add this function to `MainActivity.kt` and in `MainActivity` class:
 
 ```kotlin
 suspend fun sendMessageToWatch(
@@ -107,6 +119,8 @@ suspend fun sendMessageToWatch(
     }
 ```
 
+this function is a suspend function which means you need to invoke it inside a coroutine to avoid blocking the main thread. Read more about suspend functions [here](https://kotlinlang.org/docs/composing-suspending-functions.html).
+
 ## Watch App Setup
 
 ### Creating the Watch Project
@@ -123,23 +137,7 @@ Add to the `manifest` block in `AndroidManifest.xml`:
 <uses-permission android:name="com.google.android.wearable.permission.BIND_WEARABLE_LISTENER" />
 ```
 
-### Registering Watch Service
-
-Add to the `application` block in `AndroidManifest.xml`:
-
-```xml
-<service
-    android:name=".MessageListenerService"
-    android:exported="true">
-    <intent-filter>
-        <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-            <data
-                    android:host="*"
-                    android:pathPattern=".*"
-                    android:scheme="wear" />
-        </intent-filter>
-</service>
-```
+This permission is also a [`normal` permission](https://developer.android.com/guide/topics/permissions/overview#normal) hence you don't need to prompt the user to allow it.
 
 ### Creating Message Listener
 
@@ -161,6 +159,28 @@ class MessageListenerService : WearableListenerService() {
 }
 ```
 
+This service will run in background(even when the app is killed) and listen to `/open` from your phone. When it receives the message, it will open the app.
+
+### Registering Watch Service
+
+Add to the `application` block in `AndroidManifest.xml`:
+
+```xml
+<service
+    android:name=".MessageListenerService"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+            <data
+                    android:host="*"
+                    android:pathPattern=".*"
+                    android:scheme="wear" />
+        </intent-filter>
+</service>
+```
+
+Similar to the phone app, we need to tell android about this service.
+
 ### Message Sending Function
 
 Add to `MainActivity.kt`:
@@ -179,8 +199,14 @@ private suspend fun sendMessageToPhone(path: String, data: ByteArray) {
 }
 ```
 
+This function is a suspend function which means you need to invoke it inside a coroutine to avoid blocking the main thread. Read more about suspend functions [here](https://kotlinlang.org/docs/composing-suspending-functions.html).
+
+Now, the setup is done. You can now send messages from the watch to the phone and vice versa.
+
+This is very minimal setup and you can extend it using [`JSONObject`](https://developer.android.com/reference/org/json/JSONObject) or [`gson`](https://github.com/google/gson) to send complex objects between devices.
+
 ## Final Notes
 
-- Messages are transferred in `ByteArray` format - remember to decode the data in target device
-- For cross-platform frameworks, call `sendMessageToWatch` using MethodChannel or equivalent
+- Messages are transferred in `ByteArray` format - remember to encode the data in sender device and decode the data in target device
+- For cross-platform frameworks, call `sendMessageToWatch` using [MethodChannel](https://api.flutter.dev/flutter/services/MethodChannel-class.html) or equivalent
 - Name of services should match the name specified in `AndroidManifest.xml`
