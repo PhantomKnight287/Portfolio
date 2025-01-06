@@ -1,0 +1,175 @@
+---
+title: "Build Wear OS Apps and Connect with Android"
+summary: "Create Wear OS app and integrate them with Android, covering setup, permissions, and data sync."
+---
+
+Start by creating an android app, doesn't matter what you use to make it be it Flutter<span className="text-gray-400">(the supreme)</span>, React Native<span className="text-gray-400">(soydevs), </span>Kotlin<span className="text-gray-400">(chad)</span> or Android Views<span className="text-gray-400">(mentally ill)</span>.
+
+
+Open your android project in Android Studio(open the `android` folder if you are using cross platform frameworks).
+
+First, we need to bind a listener so we can listen to messages sent by our watch even when our app is closed/killed. So, we first need to add permissions for it and then package to actually implement it. You don't need to prompt user for allowing the permission, it will be done automatically.
+
+Add the following code in your app level gradle file(`app/build.gradle`):
+
+```kotlin
+implementation("com.google.android.gms:play-services-wearable:19.0.0")
+```
+
+Now, we need to add permission. Open `AndroidManifest.xml` and add the following code in `manifest` block:
+
+```xml
+<uses-permission android:name="com.google.android.wearable.permission.BIND_WEARABLE_LISTENER" />
+```
+
+Now, time for some kotlin code. We will write a [service](https://developer.android.com/guide/topics/manifest/service-element) which will be `android:exported`.
+
+Create a new file `WearMessageReceiver.kt` in same folder as `MainActivity.kt` and add the following code:
+
+```kotlin
+package com.your.package
+
+
+import android.content.Intent
+import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.WearableListenerService
+
+class WearMessageReceiver : WearableListenerService() {
+    override fun onMessageReceived(event: MessageEvent) {
+        when (event.path) {
+            "/open" -> {
+                val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                }
+                startActivity(intent)
+            }
+        }
+    }
+}
+```
+
+The above code listens for `/open` message and when it receives it, it will open the app.
+
+Now, we need to tell the android about this service. Open `AndroidManifest.xml` and add the following code in `application` block:
+
+```xml
+<service
+    android:name="[package name].WearMessageReceiver"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data
+            android:host="*"
+            android:pathPattern=".*"
+            android:scheme="wear" />
+    </intent-filter>
+</service>
+```
+
+Now, we need to write a function which can send messages from our phone to watch.
+
+Open `MainActivity.kt` and inside the `MainActivity` class, paste the following code:
+
+```kotlin
+suspend fun sendMessageToWatch(
+        context: Context,
+        path: String,
+        data: ByteArray = ByteArray(0)
+    ) {
+        withContext(Dispatchers.IO) {
+            try {
+                val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
+                // it is recommended to filter out nodes with `isNearby = false`
+                nodes.forEach { node ->
+                    Tasks.await(
+                        Wearable.getMessageClient(context).sendMessage(
+                            node.id,
+                            path,
+                            data,
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+```
+
+Messages between the devices are transferred in `ByteArray` format so keep that in mind that you will have to decode the data in watch.
+
+Phone setup is now done, now time for Watch.
+
+Here, you will need a Wear OS device connected to your phone and connected to your PC via wireless debugging.
+
+Don't have a Wear OS device? Don't worry, create a new emulator and run it and follow the setup instructions. It will connect to your phone(unlike apple watch sim).
+
+Create a new Wear OS app and name it anything.
+
+`Android Studio > File > New > New Project > Wear OS > Empty Wear App`. Keep the bundle identifier same as your phone app.
+
+Now, same as phone, we need to bind a listener and add permission. Open `AndroidManifest.xml` and add the following code in `manifest` block:
+
+```xml
+<uses-permission android:name="com.google.android.wearable.permission.BIND_WEARABLE_LISTENER" />
+```
+
+and following code in `application` block:
+
+```xml
+<service
+    android:name=".MessageListenerService"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+            <data
+                    android:host="*"
+                    android:pathPattern=".*"
+                    android:scheme="wear" />
+        </intent-filter>
+</service>
+```
+
+Now, create a new kotlin file `MessageListenerService.kt` and add the following code:
+
+```kotlin
+// make sure the name of this class matches the one in AndroidManifest.xml
+class MessageListenerService : WearableListenerService() {
+    override fun onMessageReceived(event: MessageEvent) {
+        super.onMessageReceived(event)
+        when (event.path) {
+            "/boot" -> {
+                val intent = Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+            }
+        }
+
+    }
+}
+```
+
+and now, in `MainActivity.kt` add the following code to send messages from watch to phone:
+
+```kotlin
+ private suspend fun sendMessageToPhone(path: String, data: ByteArray) {
+        val connectedNodes = Wearable.getNodeClient(this).connectedNodes.await()
+        println("Connected nodes: $connectedNodes")
+        for (node in connectedNodes) {
+            try {
+                messageClient.sendMessage(node.id, path, data).await()
+            } catch (e: Exception) {
+                println("Failed to send message to node ${node.id}: ${e.message}")
+            }
+        }
+    }
+```
+
+
+Now, your setup is ready to send messages back and forth between the devices.
+
+You will need to use Jetpack Compose to create wear os app but you can call the `sendMessageToWatch` function using MethodChannel or equivalent in your cross platform framework.
+
