@@ -1,7 +1,6 @@
 import { createPreset } from "fumadocs-ui/tailwind-plugin";
 
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -17,8 +16,12 @@ module.exports = {
         "gradient-conic":
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
       },
+      fontFamily: {
+        sans: ["var(--font-sans)"],
+        mono: ["var(--font-mono)"],
+      },
     },
   },
   plugins: [require("@tailwindcss/typography")],
   presets: [createPreset()],
-};
+} satisfies import("tailwindcss").Config;

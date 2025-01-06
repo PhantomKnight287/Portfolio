@@ -31,8 +31,8 @@ export default async function Page(props: { params: { slug: string } }) {
   );
   if (!post) return notFound();
   return (
-    <main className="min-h-screen container items-center justify-center flex-col">
-      <div className="flex flex-col max-w-[600px] mx-auto p-5 lg:p-0">
+    <article className="min-h-screen container items-center justify-center flex-col">
+      <div className="flex flex-col max-w-[600px] mx-auto p-0">
         <div className="container prose prose-invert prose-lg my-5">
           <h1 className="text-xl font-bold">{post.title}</h1>
           <p className="text-base text-gray-400 mb-10">{post.summary}</p>
@@ -41,7 +41,7 @@ export default async function Page(props: { params: { slug: string } }) {
             components={{
               ...defaultComponents,
               pre: ({ ref: _ref, ...props }) => (
-                <CodeBlock {...props} keepBackground>
+                <CodeBlock {...props} keepBackground className="font-mono">
                   <Pre>{props.children}</Pre>
                 </CodeBlock>
               ),
@@ -49,6 +49,6 @@ export default async function Page(props: { params: { slug: string } }) {
           />
         </div>
       </div>
-    </main>
+    </article>
   );
 }
