@@ -20,6 +20,28 @@ interface Project {
 
 export const Projects: Project[] = [
   {
+    name: "Cortex Chat",
+    slug: "cortex",
+    image: {
+      url: "https://cortex.procrastinator.fyi/logo.png",
+      alt: "Cortex Chat",
+      height: 100,
+      width: 100,
+    },
+    description:
+      "Experience the most advanced AI models, document analysis, and web search capabilities in a beautifully designed iOS app.",
+    smallDescription: "AI chat app",
+    tags: [
+      "Flutter",
+      "OpenRouter",
+      "Hono",
+      "Postgres",
+      "Better Auth",
+      "Prisma",
+    ],
+    urls: { liveUrl: "https://cortex.procrastinator.fyi" },
+  },
+  {
     name: "Voice Learn",
     slug: "voice-learn",
     image: {
@@ -57,7 +79,7 @@ export const Projects: Project[] = [
     },
     urls: {
       githubUrl: "https://github.com/phantomknight287/frameground",
-      liveUrl: "https://frameground.tech",
+      liveUrl: "https://frameground-web.vercel.app",
     },
     description: "Learn JavaScript frameworks with interactive challenges",
     tags: ["Next.js", "Typescript", "Tailwind CSS", "Prisma", "PostgreSQL"],

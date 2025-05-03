@@ -26,7 +26,7 @@ export default function RootLayout({
                   alt="PhantomKnigh287"
                   width={44}
                   height={44}
-                  className="rounded-full"
+                  className="rounded-md"
                 />
               </Link>
               <div className="flex flex-col ml-2">

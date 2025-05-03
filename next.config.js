@@ -7,6 +7,7 @@ const nextConfig = {
       "repository-images.githubusercontent.com",
       "github.com",
       "voicelearn.tech",
+      "cortex.procrastinator.fyi",
     ],
   },
   swcMinify: true,

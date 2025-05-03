@@ -1,6 +1,7 @@
 import ImageWithLoader from "@/components/loadingimage";
 import BackButton from "@/components/shared/back";
 import { Projects } from "@/constants";
+import { cn } from "@/lib/utils";
 import { upperFirst } from "@/utils/uppercase";
 import { Metadata } from "next";
 import { FiExternalLink, FiGithub } from "react-icons/fi";
@@ -53,7 +54,10 @@ async function ProjectPage(props: Props) {
       <BackButton />
 
       <ImageWithLoader
-        className="mx-auto rounded-md mt-5 object-cover w-full h-[unset]"
+        className={cn(
+          "mx-auto rounded-md mt-5 object-cover h-[unset]",
+          project.image.width > 100 ? "w-full" : "w-1/2"
+        )}
         src={project.image.url}
         alt={project.image.alt}
         loading="eager"
