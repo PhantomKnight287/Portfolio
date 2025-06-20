@@ -56,7 +56,7 @@ export default function Home() {
           <Transition />
         </h1>
         <p className="mt-5 text-xl text-gray-400">
-          I&apos;m Gurpal Singh, an{" "}
+          I&apos;m Gurpal Singh, a{" "}
           {Math.floor(
             (new Date().getTime() - new Date("2005-04-30").getTime()) /
               (1000 * 60 * 60 * 24 * 365.25)
