@@ -8,9 +8,13 @@ import { getTranslations } from "next-intl/server";
 import { FiExternalLink, FiGithub } from "react-icons/fi";
 
 export async function generateStaticParams() {
-  return Projects.map((p) => ({
-    name: encodeURIComponent(p.slug),
-  }));
+  const localeOptions = ["de", "en"];
+  return localeOptions.flatMap((locale) =>
+    Projects.map((p) => ({
+      name: encodeURIComponent(p.slug),
+      locale,
+    }))
+  );
 }
 interface Props {
   params: Promise<{
