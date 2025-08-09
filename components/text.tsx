@@ -8,7 +8,7 @@ import {
   animated,
   config,
   SpringConfig,
-} from "@react-spring/web";
+} from "react-spring";
 
 export interface TextTransitionProps {
   className?: string;

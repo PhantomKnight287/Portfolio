@@ -7,7 +7,6 @@ const TEXTS = ["website", "backend", "app"];
 
 export default function Transition() {
   const [index, setIndex] = useState(0);
-
   useEffect(() => {
     const intervalId = setInterval(
       () => setIndex((index) => index + 1),

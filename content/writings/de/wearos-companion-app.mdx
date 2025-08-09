@@ -1,0 +1,193 @@
+---
+title: "Erstellen Sie Wear OS-Apps und verbinden sie mit Android"
+summary: "Erstellen Sie Wear OS-Apps und verbinden  sie mit Android. Behandelt Einrichtung, Erlaubnis und Informationen Mitnahme."
+---
+
+## Ersteinrichtung
+
+Beginnen Sie mit dem Erstellung einer Android-App mit Ihrem bevorzugten Framework und öffnen Sie Ihr Projekt in Android Studio(öffnen Sie den ordnen „Android“, wenn Sie plattformübergreifende Frameworks verwenden).
+
+## Einrichtung der Telefon-App
+
+Erste wir müssen einen Listener binden, damit wir die von unserer Uhr gesendenten Nachrichten auch dann abhören können, wenn unsere App geschlossen/beendet ist. Dazu müssen Berechtigungen hinzufügen und das Paket implementiert werden. Machen Sie sich keine Gedanken darüber, Benutzer nach Berechtigungen zu fragen – das ist nicht nötig, da es sich um eine [normale](https://developer.android.com/guide/topics/permissions/overview#normal) Berechtigung handelt.
+
+### Hinzufügen von Berechtigungen
+
+Fügen Sie Ihrer Gradle-Datei auf App-Ebene Folgendes hinzu(`app/build.gradle`):
+
+```kotlin
+implementation("com.google.android.gms:play-services-wearable:19.0.0")
+```
+
+Vergessen Sie nicht, auf `Sync Now` zu drücken.
+
+### Berechtigungseinrichtung
+
+Fügen Sie den folgenden Code in den `Manifest`-Block von `AndroidManifest.xml` ein:
+
+```xml
+<uses-permission android:name="com.google.android.wearable.permission.BIND_WEARABLE_LISTENER" />
+```
+
+
+### Nachrichtenempfänger Receiver
+
+Jetzt schreiben wir einen Dienst namens `android:exported`. Erstellen Sie eine neue Datei `WearMessageReceiver.kt` im selben Ordner wie `MainActivity.kt`:
+
+
+```kotlin
+package com.your.package
+
+import android.content.Intent
+import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.WearableListenerService
+
+class WearMessageReceiver : WearableListenerService() {
+    override fun onMessageReceived(event: MessageEvent) {
+        when (event.path) {
+            "/open" -> {
+                val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                }
+                startActivity(intent)
+            }
+        }
+    }
+}
+```
+
+Der obige Code wartet auf die Nachrichten `/open` und öffnet die App, wenn er empfangen wird.
+
+### Registrieren des Dienstes
+
+Wir müssen unserem Telefon von diesem Dienst erzählen. Fügen Sie den folgenden Code in den `application`-block von `AndroidManifest.xml` ein:
+
+```xml
+<service
+    android:name="[package name].WearMessageReceiver"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data
+            android:host="*"
+            android:pathPattern=".*"
+            android:scheme="wear" />
+    </intent-filter>
+</service>
+```
+
+### Nachrichtensendefunktion
+
+Diese Funktion sendet Nachrichten von unserem Telefon an die Uhr. Fügen Sie es zu `MainActivity.kt` hinzu:
+
+```kotlin
+suspend fun sendMessageToWatch(
+        context: Context,
+        path: String,
+        data: ByteArray = ByteArray(0)
+    ) {
+        withContext(Dispatchers.IO) {
+            try {
+                val nodes = Tasks.await(Wearable.getNodeClient(context).connectedNodes)
+                // it is recommended to filter out nodes with `isNearby = false`
+                nodes.forEach { node ->
+                    Tasks.await(
+                        Wearable.getMessageClient(context).sendMessage(
+                            node.id,
+                            path,
+                            data,
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+```
+
+Weitere Informationen zu Suspend-Funktionen finden Sie [hier](https://kotlinlang.org/docs/composing-suspending-functions.html).
+
+
+## Einrichtung der Watch-App
+
+Hierfür benötigen Sie ein Wear OS-Gerät, das mit Ihrem Telefon und per Wireless-Debugging mit Ihrem PC verbunden ist. Sie haben kein Wear OS-Gerät? Kein Problem! Erstellen Sie einen neuen Emulator und führen Sie ihn gemäß den Einrichtungsanweisungen aus. Im Gegensatz zum Apple Watch-Simulator wird er mit Ihrem physischen Telefon oder Emulator verbunden.
+
+### Erstellen des Watch-Projekt
+
+1. Gehen Sie zu `Android Studio > File > New > New Project > Wear OS > Empty Wear App`
+2. Behalten Sie die Bundle-ID bei, die mit der Ihrer Telefon-App identisch ist.
+3. Verbinden Sie ein Wear OS-Gerät oder erstellen Sie einen Emulator.
+
+### Hinzufügen von Berechtigungen
+
+Genau wie bei der Telefon-App müssen wir einen Listener binden und Berechtigungen hinzufügen. Fügen Sie dem Block `manifest` in `AndroidManifest.xml` Folgendes hinzu:
+
+```xml
+<uses-permission android:name="com.google.android.wearable.permission.BIND_WEARABLE_LISTENER" />
+```
+
+### Erstellen des Nachrichtenempfänger
+
+Erstellen Sie `MessageListenerService.kt`:
+
+```kotlin
+
+class MessageListenerService : WearableListenerService() {
+    override fun onMessageReceived(event: MessageEvent) {
+        super.onMessageReceived(event)
+        when (event.path) {
+            "/boot" -> {
+                val intent = Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+            }
+        }
+    }
+}
+```
+
+### Registrieren des Dienstes
+
+Fügen Sie dem Block `application` in `AndroidManifest.xml` hinzu:
+
+```xml
+<service
+    android:name=".MessageListenerService"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+            <data
+                    android:host="*"
+                    android:pathPattern=".*"
+                    android:scheme="wear" />
+        </intent-filter>
+</service>
+```
+
+### Nachrichtensendefunktion
+
+Fügen Sie den folgenden Code in `MainActivity.kt` hinzu:
+
+```kotlin
+private suspend fun sendMessageToPhone(path: String, data: ByteArray) {
+    val connectedNodes = Wearable.getNodeClient(this).connectedNodes.await()
+
+    for (node in connectedNodes) {
+        try {
+            messageClient.sendMessage(node.id, path, data).await()
+        } catch (e: Exception) {
+            println("Failed to send message to node ${node.id}: ${e.message}")
+        }
+    }
+}
+```
+
+## Abschließende Anmerkungen
+
+- Nachrichten zwischen Geräten werden in `ByteArray`-Format übertragen - denken Sie daran, Daten im Sender-Gerät zu kodieren und im Empfänger-Gerät zu dekodieren
+- Für plattformübergreifende Frameworks können Sie `sendMessageToWatch` mit [MethodChannel](https://api.flutter.dev/flutter/services/MethodChannel-class.html) oder äquivalent aufrufen
+- Der Name der Dienste muss mit dem in `AndroidManifest.xml` angegebenen Namen übereinstimmen 

@@ -1,16 +1,35 @@
 import { defineCollection, defineConfig } from "@content-collections/core";
 import { compileMDX } from "@content-collections/mdx";
 import rehypeShiki from "@shikijs/rehype";
-// for more information on configuration, visit:
-// https://www.content-collections.dev/docs/configuration
 
-const writings = defineCollection({
-  name: "writings",
-  directory: "content/writings",
+const englishWritings = defineCollection({
+  name: "englishWritings",
+  directory: "content/writings/en",
   include: "*.mdx",
   schema: (z) => ({
     title: z.string(),
     summary: z.string(),
+    locale: z.literal("en").default("en"),
+  }),
+  transform: async (document, context) => {
+    const mdx = await compileMDX(context, document, {
+      rehypePlugins: [[rehypeShiki, { theme: "ayu-dark" }]],
+    });
+    return {
+      ...document,
+      mdx,
+    };
+  },
+});
+
+const germanWritings = defineCollection({
+  name: "germanWritings",
+  directory: "content/writings/de",
+  include: "*.mdx",
+  schema: (z) => ({
+    title: z.string(),
+    summary: z.string(),
+    locale: z.literal("de").default("de"),
   }),
   transform: async (document, context) => {
     const mdx = await compileMDX(context, document, {
@@ -24,5 +43,5 @@ const writings = defineCollection({
 });
 
 export default defineConfig({
-  collections: [writings],
+  collections: [englishWritings, germanWritings],
 });

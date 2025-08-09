@@ -3,69 +3,87 @@ import { AiOutlineRight, AiOutlineMail } from "react-icons/ai";
 import { FiGithub } from "react-icons/fi";
 import { Projects } from "@/constants";
 import Badge from "@/components/badge";
-import Image from "next/image";
-import Link from "next/link";
-import { allWritings } from "@/.content-collections/generated";
+import {
+  allEnglishWritings,
+  allGermanWritings,
+} from "@/.content-collections/generated";
 import Nextjs from "@/icons/next";
 import NestJS from "@/icons/nest";
 import Prisma from "@/icons/prisma";
 import Grafana from "@/icons/grafana";
 import Flutter from "@/icons/flutter";
+import { Link } from "@/i18n/navigation";
+import { getLocale, getTranslations } from "next-intl/server";
+import { Metadata } from "next";
 
-export const metadata = {
-  title: "Gurpal Singh | PhantomKnight287",
-  description: "I am a Full Stack Web and App Developer from India.",
-  openGraph: {
-    title: "Gurpal Singh | PhantomKnight287",
-    description: "I am a Full Stack Web and App Developer from India.",
-    // @ts-ignore
-    type: "website",
-    url: "https://phantomknight287.github.io/",
-    site_name: "Gurpal Singh | PhantomKnight287",
-    images: [
-      {
-        url: "https://github.com/phantomknight287.png",
-        width: 200,
-        height: 200,
-        alt: "PhantomKnight287",
-      },
-    ],
-  },
-  twitter: {
-    site: "@PhantomKnight287",
-    title: "Gurpal Singh | PhantomKnight287",
-    description: "I am a Full Stack Web and App Developer from India.",
-    card: "summary_large_image",
-    creator: "gurpalsingh287",
-    images: [
-      {
-        url: "https://github.com/phantomknight287.png",
-        width: 200,
-        height: 200,
-      },
-    ],
-  },
-};
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale: locale });
 
-export default function Home() {
+  return {
+    title: "Gurpal Singh | PhantomKnight287",
+    description: t("HomePage.summary"),
+    openGraph: {
+      title: "Gurpal Singh | PhantomKnight287",
+      description: t("HomePage.summary"),
+      type: "website",
+      url: "https://phantomknight287.github.io/",
+      siteName: "Gurpal Singh | PhantomKnight287",
+      images: [
+        {
+          url: "https://github.com/phantomknight287.png",
+          width: 200,
+          height: 200,
+          alt: "PhantomKnight287",
+        },
+      ],
+    },
+    twitter: {
+      site: "@PhantomKnight287",
+      title: "Gurpal Singh | PhantomKnight287",
+      description: t("HomePage.summary"),
+      card: "summary_large_image",
+      creator: "gurpalsingh287",
+      images: [
+        {
+          url: "https://github.com/phantomknight287.png",
+          width: 200,
+          height: 200,
+        },
+      ],
+    },
+  };
+}
+
+function getProjectSummaryString(
+  project: (typeof Projects)[number]
+): `Projects.${string}.summary` {
+  return `Projects.${project.slug}.summary` as const;
+}
+
+export default async function Home() {
+  const t = await getTranslations();
+  const locale = await getLocale();
+
   return (
     <div className="flex mt-5 flex-col max-w-[600px] mx-auto p-5 lg:p-0">
       <div className="container">
         <h1 className="text-xl font-bold text-gray-400">
-          <span className="">I make</span>
+          <span className="">{t("HomePage.tagline")}</span>
           <Transition />
         </h1>
         <p className="mt-5 text-xl text-gray-400">
-          I&apos;m Gurpal Singh, a{" "}
-          {Math.floor(
-            (new Date().getTime() - new Date("2005-04-30").getTime()) /
-              (1000 * 60 * 60 * 24 * 365.25)
-          )}{" "}
-          year old developer living in India. I am a self-taught developer who
-          loves to code and make things.
+          {t("HomePage.description", {
+            age: Math.floor(
+              (new Date().getTime() - new Date("2005-04-30").getTime()) /
+                (1000 * 60 * 60 * 24 * 365.25)
+            ),
+          })}
         </p>
         <p className="mt-5 text-xl text-gray-400">
-          Currently working in a company and messing with{" "}
+          {t("HomePage.currently")}{" "}
           <Badge href="https://nextjs.org">
             <Nextjs className="inline-flex mr-1" /> Next.js
           </Badge>
@@ -83,12 +101,21 @@ export default function Home() {
             <Grafana className="inline-block mr-1" />
             Grafana
           </Badge>{" "}
-          and learning{" "}
+          {t("HomePage.learning")}{" "}
           <Badge href={"https://flutter.dev"}>
             <Flutter className="inline-block mr-1" />
             Flutter
-          </Badge>.
+          </Badge>
+          .
         </p>
+        {locale == "de" ? (
+          <>
+            <p className="mt-5 text-xl text-gray-400">
+              Notiz: Ich lerne Deutsch und habe beschlossen, mein Portfolio zur
+              Übung zu übersetzen. Bitte verzeihen Sie mir etwaige Fehler.
+            </p>
+          </>
+        ) : null}
 
         <div className="flex items-start mt-5 w-full justify-start flex-col">
           {/* <div className="flex flex-row items-center justify-start">
@@ -125,13 +152,15 @@ export default function Home() {
         </div>
         <div className="w-full h-[1px] "></div>
         <div className="mt-5">
-          <h1 className="text-2xl text-white mt-5 mb-5">Projects</h1>
+          <h1 className="text-2xl text-white mt-5 mb-5">
+            {t("Projects.title")}
+          </h1>
           <div className="flex flex-col">
             {Projects.map((project) => (
               <Link
                 className="proj group"
                 key={project.name.replace(" ", "-")}
-                href={`/project/${project.slug}`}
+                href={`/projects/${project.slug}`}
               >
                 <article className="flex flex-row gap-0 items-start justify-between lg:justify-start mt-1 mb-1 w-full overflow-hidden">
                   <div className="flex flex-row gap-2 justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto mr-3">
@@ -139,7 +168,7 @@ export default function Home() {
                       {project.name}
                     </h1>
                     <p className="line-clamp-1 text-gray-400 max-w-full">
-                      {project.smallDescription}
+                      {t(`Projects.${project.slug}.summary`)}
                     </p>
                   </div>
                 </article>
@@ -150,7 +179,9 @@ export default function Home() {
         <div className="mt-5">
           <h1 className="text-2xl text-white mt-5 mb-5">Writings</h1>
           <div className="flex flex-col">
-            {allWritings.map((writing) => (
+            {[
+              ...(locale === "en" ? allEnglishWritings : allGermanWritings),
+            ].map((writing) => (
               <Link
                 className="proj group"
                 key={writing._meta.path}

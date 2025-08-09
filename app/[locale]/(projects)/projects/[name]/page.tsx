@@ -4,6 +4,7 @@ import { Projects } from "@/constants";
 import { cn } from "@/lib/utils";
 import { upperFirst } from "@/utils/uppercase";
 import { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { FiExternalLink, FiGithub } from "react-icons/fi";
 
 export async function generateStaticParams() {
@@ -12,23 +13,24 @@ export async function generateStaticParams() {
   }));
 }
 interface Props {
-  params: {
+  params: Promise<{
     name: string;
-  };
+  }>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const project = Projects.find(
     (p) => encodeURIComponent(p.slug) === encodeURIComponent(params.name)
   )!;
-
+  const translation = await getTranslations("Projects");
   return {
     title: project.name,
-    description: project.description,
+    description: translation(`${project.slug}.description`),
     openGraph: {
       type: "website",
       title: project.name,
-      description: project.description,
+      description: translation(`${project.slug}.description`),
       images: [
         {
           url: project.image?.url,
@@ -46,11 +48,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 async function ProjectPage(props: Props) {
+  const params = await props.params;
   const project = Projects.find(
-    (p) => encodeURIComponent(p.slug) === encodeURIComponent(props.params.name)
+    (p) => encodeURIComponent(p.slug) === encodeURIComponent(params.name)
   )!;
+  const translation = await getTranslations("Projects");
   return (
-    <div className="min-h-screen lg:pt-20 lg:p-0 p-5 container items-center justify-center flex-col lg:max-w-xl overflow-hidden">
+    <div className="min-h-screen p-5 container items-center justify-center flex-col lg:max-w-xl overflow-hidden">
       <BackButton />
 
       <ImageWithLoader
@@ -94,7 +98,9 @@ async function ProjectPage(props: Props) {
       </div>
 
       <div className="flex flex-col items-start justify-start gap-2.5">
-        <p className="text-lg text-left text-gray-300">{project.description}</p>
+        <p className="text-lg text-left text-gray-300">
+          {translation(`${project.slug}.description`)}
+        </p>
         <div className="flex flex-row flex-wrap items-center justify-start gap-2.5">
           {project.tags?.map((tag) => (
             <span

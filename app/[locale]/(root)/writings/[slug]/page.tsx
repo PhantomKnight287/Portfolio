@@ -1,4 +1,7 @@
-import { allWritings } from "content-collections";
+import {
+  allEnglishWritings,
+  allGermanWritings,
+} from "@/.content-collections/generated";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MDXContent } from "@content-collections/mdx/react";
@@ -6,14 +9,18 @@ import defaultComponents from "fumadocs-ui/mdx";
 import { Pre, CodeBlock } from "fumadocs-ui/components/codeblock";
 
 export async function generateStaticParams() {
-  return allWritings.map((writing) => ({ slug: writing._meta.path }));
+  return [...allEnglishWritings, ...allGermanWritings].map((writing) => ({
+    slug: writing._meta.path,
+    locale: writing.locale,
+  }));
 }
-export async function generateMetadata({
-  params,
-}: {
-  params: { slug: string };
+export async function generateMetadata(props: {
+  params: Promise<{ slug: string; locale: string }>;
 }): Promise<Metadata> {
-  const post = allWritings.find((post) => post._meta.path === params.slug);
+  const params = await props.params;
+  const post = [...allEnglishWritings, ...allGermanWritings].find(
+    (post) => post._meta.path === params.slug && post.locale === params.locale
+  );
   if (!post) return {};
   return {
     title: post.title,
@@ -25,9 +32,12 @@ export async function generateMetadata({
   };
 }
 
-export default async function Page(props: { params: { slug: string } }) {
-  const post = allWritings.find(
-    (post) => post._meta.path === props.params.slug
+export default async function Page(props: {
+  params: Promise<{ slug: string; locale: string }>;
+}) {
+  const params = await props.params;
+  const post = [...allEnglishWritings, ...allGermanWritings].find(
+    (post) => post._meta.path === params.slug && post.locale === params.locale
   );
   if (!post) return notFound();
   return (

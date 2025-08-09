@@ -1,7 +1,13 @@
-interface Project {
+export type ProjectSlug =
+  | "voice-learn"
+  | "cortex"
+  | "frameground"
+  | "music-ai"
+  | "voto";
+
+export interface Project {
   name: string;
-  slug: string;
-  smallDescription?: string;
+  slug: ProjectSlug;
   image: {
     url: string;
     alt: string;
@@ -14,11 +20,10 @@ interface Project {
     liveUrl?: string;
     [key: string]: string | undefined;
   };
-  description: string;
   tags: string[];
 }
 
-export const Projects: Project[] = [
+export const Projects = [
   {
     name: "Cortex Chat",
     slug: "cortex",
@@ -28,9 +33,6 @@ export const Projects: Project[] = [
       height: 100,
       width: 100,
     },
-    description:
-      "Experience the most advanced AI models, document analysis, and web search capabilities in a beautifully designed iOS app.",
-    smallDescription: "AI chat app",
     tags: [
       "Flutter",
       "OpenRouter",
@@ -65,8 +67,6 @@ export const Projects: Project[] = [
     urls: {
       liveUrl: "https://voicelearn.tech",
     },
-    description: "An app to practice writing and speaking of any language.",
-    smallDescription: "AI powered language learning app",
   },
   {
     name: "FrameGround",
@@ -81,9 +81,7 @@ export const Projects: Project[] = [
       githubUrl: "https://github.com/phantomknight287/frameground",
       liveUrl: "https://frameground-web.vercel.app",
     },
-    description: "Learn JavaScript frameworks with interactive challenges",
     tags: ["Next.js", "Typescript", "Tailwind CSS", "Prisma", "PostgreSQL"],
-    smallDescription: "In browser code playground",
   },
   {
     name: "Music.ai",
@@ -94,12 +92,9 @@ export const Projects: Project[] = [
       height: 441,
       alt: "Music.ai",
     },
-    description:
-      "A revolutionary product that brings your music to life with advanced AI technology.",
     urls: {
       liveUrl: "https://musicaicentral.com",
     },
-    smallDescription: "AI powered music app",
     tags: [
       "React Native",
       "Expo Router",
@@ -112,13 +107,10 @@ export const Projects: Project[] = [
   },
   {
     name: "Voto",
-    description:
-      "A realtime voting platform where organisations can register and create junior admins to create and manage polls, register candidates and allow them to participate in certain polls, voters can register and vote for their favourite candidates and view a realtime graph of the results. Used by 3000 voters and over 7000 votes casted in the first 1 month of launch.",
     slug: "voto",
     urls: {
       liveUrl: "https://voto.com.ng",
     },
-    smallDescription: "Live voting app",
     image: {
       url: "/voto.png",
       width: 417,
@@ -138,4 +130,4 @@ export const Projects: Project[] = [
       "Chart.js",
     ],
   },
-];
+] as Project[];

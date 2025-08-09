@@ -1,0 +1,32 @@
+{
+	"HomePage": {
+		"currently": "Momentan arbeite ich in einem Firma und nutzen",
+		"description": "Ich bin Gurpal Singh, ein {age}-jähriger Entwickler, der in Indien lebt. Ich bin ein autodidaktischer Entwickler, der gerne programmiert und Dinge herstellt.",
+		"learning": "und lerne",
+		"summary": "Ich bin ein Full Stack Web und App Entwickler aus Indien.",
+		"tagline": "Ich erstelle"
+	},
+	"Projects": {
+		"cortex": {
+			"description": "Erleben Sie die fortschrittlichsten KI-Modelle, Dokumentanalysen und Websuchfunktionen in einer wunderschön gestalteten iOS-App.",
+			"summary": "KI-Chatten-App"
+		},
+		"frameground": {
+			"description": "Lernen Javascript-frameworks mit interaktiv Herausforderungen.",
+			"summary": "in Browser-Code-Spielplatz"
+		},
+		"music-ai": {
+			"description": "Ein revolutionäres Produkt, das Ihre Musik mit fortschrittlicher KI-Technologie zum Leben erweckt.",
+			"summary": "KI Angetrieben Musik App"
+		},
+		"title": "Projekte",
+		"voice-learn": {
+			"description": "Einen App zu üben Schreiben und Sprachen von beliebig Sprache.",
+			"summary": "KI Angetrieben Sprachelern-App"
+		},
+		"voto": {
+			"description": "Eine Echtzeit-Abstimmungsplattform, auf der sich Organisationen registrieren und Junior-Admins erstellen können, um Umfragen zu erstellen und zu verwalten, Kandidaten zu registrieren und ihnen die Teilnahme an bestimmten Umfragen zu ermöglichen. Wähler können sich registrieren und für ihre Lieblingskandidaten stimmen und eine Echtzeitgrafik der Ergebnisse anzeigen. Im ersten Monat nach der Einführung wurde die Plattform von 3.000 Wählern genutzt und über 7.000 Stimmen abgegeben.(Google übersetzt)",
+			"summary": "Live-Abstimmungs-App"
+		}
+	}
+}
