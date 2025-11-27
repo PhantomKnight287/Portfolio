@@ -10,6 +10,7 @@ const englishWritings = defineCollection({
     title: z.string(),
     summary: z.string(),
     locale: z.literal("en").default("en"),
+    date: z.coerce.date(),
   }),
   transform: async (document, context) => {
     const mdx = await compileMDX(context, document, {
@@ -30,6 +31,7 @@ const germanWritings = defineCollection({
     title: z.string(),
     summary: z.string(),
     locale: z.literal("de").default("de"),
+    date: z.coerce.date(),
   }),
   transform: async (document, context) => {
     const mdx = await compileMDX(context, document, {

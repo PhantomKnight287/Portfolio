@@ -17,7 +17,8 @@ const nextConfig: NextConfig = {
       new URL("https://avatars.githubusercontent.com/**"),
       new URL("https://repository-images.githubusercontent.com/**"),
       new URL("https://voicelearn.tech/**"),
-      new URL("https://cortex.procrastinator.fyi/**"),
+      new URL("https://*.procrastinator.fyi/**"),
+      new URL("https://raw.githubusercontent.com/**"),
     ],
   },
 };
@@ -25,5 +26,5 @@ const nextConfig: NextConfig = {
 const withNextIntl = createNextIntlPlugin();
 
 export default withContentCollections(
-  withIntlWatcher(withNextIntl(nextConfig))
+  withIntlWatcher(withNextIntl(nextConfig)),
 );

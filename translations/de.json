@@ -7,6 +7,10 @@
 		"tagline": "Ich erstelle"
 	},
 	"Projects": {
+		"aero": {
+			"description": "Verflogen Sie Ihre Flüge von verschiedener Fluggesellschaften in einer einzigen App. Aero ist der Flugbegleiter, auf den Sie gewartet haben. Verflogen Sie Ihre Live-Flüge, protokollieren Sie Ihre vergangenen Abenteuer und erzählen Sie eine Geschichte über Ihre Reise.",
+			"summary": "Ein Flight-Tracker App"
+		},
 		"cortex": {
 			"description": "Erleben Sie die fortschrittlichsten KI-Modelle, Dokumentanalysen und Websuchfunktionen in einer wunderschön gestalteten iOS-App.",
 			"summary": "KI-Chatten-App"

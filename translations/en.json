@@ -7,6 +7,10 @@
 		"tagline": "I make"
 	},
 	"Projects": {
+		"aero": {
+			"description": "Track your flights, from different airlines, all in one app. Aero is the flight companion you've been waiting for. Track your live flights, log your past adventures, and tell a story about your journey.",
+			"summary": "A flight tracker"
+		},
 		"cortex": {
 			"description": "Experience the most advanced AI models, document analysis, and web search capabilities in a beautifully designed iOS app.",
 			"summary": "AI chat app"

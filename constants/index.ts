@@ -47,7 +47,7 @@ export const Projects = [
     name: "Voice Learn",
     slug: "voice-learn",
     image: {
-      url: "https://voicelearn.tech/logo.png",
+      url: "https://voicelearn.procrastinator.fyi/logo.png",
       alt: "Voice Learn",
       height: 381,
       width: 495,
@@ -65,7 +65,7 @@ export const Projects = [
       "Next.js",
     ],
     urls: {
-      liveUrl: "https://voicelearn.tech",
+      liveUrl: "https://voicelearn.procrastinator.fyi",
     },
   },
   {
@@ -84,26 +84,19 @@ export const Projects = [
     tags: ["Next.js", "Typescript", "Tailwind CSS", "Prisma", "PostgreSQL"],
   },
   {
-    name: "Music.ai",
-    slug: "music-ai",
+    name: "Aero",
+    slug: "aero",
     image: {
-      url: "/music-ai.jpg",
-      width: 674,
-      height: 441,
-      alt: "Music.ai",
+      url: "https://raw.githubusercontent.com/PhantomKnight287/aero/refs/heads/main/landing/public/features/og.png",
+      width: 1274,
+      height: 956,
+      alt: "Aero",
     },
     urls: {
-      liveUrl: "https://musicaicentral.com",
+      liveUrl: "https://aero.procrastinator.fyi",
+      githubUrl: "https://github.com/phantomknight287/aero",
     },
-    tags: [
-      "React Native",
-      "Expo Router",
-      "Typescript",
-      "Nest.js",
-      "PostgreSQL",
-      "Supabase",
-      "In app purchases",
-    ],
+    tags: ["Flutter", "Nest.js", "Redis", "PostgreSQL", "Prisma"],
   },
   {
     name: "Voto",
