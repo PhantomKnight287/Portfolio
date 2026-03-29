@@ -2,7 +2,7 @@ export type ProjectSlug =
   | "voice-learn"
   | "cortex"
   | "frameground"
-  | "music-ai"
+  | "aero"
   | "voto";
 
 export interface Project {
