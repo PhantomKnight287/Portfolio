@@ -1,9 +1,7 @@
-import { PropsWithChildren } from "react";
+import type { PropsWithChildren } from "react";
 import "./globals.css";
 import { NextIntlClientProvider } from "next-intl";
 import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
-import { Link } from "@/i18n/navigation";
-import Image from "next/image";
 
 const font = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-sans" });
 

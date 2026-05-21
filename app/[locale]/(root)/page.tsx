@@ -15,6 +15,7 @@ import Flutter from "@/icons/flutter";
 import { Link } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Metadata } from "next";
+import { EffectTS } from "@/icons/effect";
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
@@ -97,6 +98,11 @@ export default async function Home() {
             Prisma
           </Badge>
           ,{" "}
+          <Badge href="https://effect.website" className="mr-1">
+            <EffectTS className="inline-block mr-1" />
+            Effect
+          </Badge>
+          ,{" "}
           <Badge href="https://grafana.com/" className="ml-10">
             <Grafana className="inline-block mr-1" />
             Grafana
@@ -118,12 +124,12 @@ export default async function Home() {
         ) : null}
 
         <div className="flex items-start mt-5 w-full justify-start flex-col">
-          {/* <div className="flex flex-row items-center justify-start">
+           <div className="flex flex-row items-center justify-start">
               <div className="aspect-square flex-none h-[10px] overflow-hidden relative w-2.5 will-change-transform bg-green-500 rounded-full"></div>
               <div className="flex flex-col justify-start shrink-0 opacity-100 ml-2 ">
                 <p className="text-white">Available for new opportunities</p>
               </div>
-            </div> */}
+            </div>
           <br />
           <div className="flex flex-row mt-3 gap-3">
             <a

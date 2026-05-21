@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
       new URL("https://voicelearn.tech/**"),
       new URL("https://*.procrastinator.fyi/**"),
       new URL("https://raw.githubusercontent.com/**"),
+      new URL("https://saturn.procrastinator.fyi/api/og?page=Saturn")
     ],
   },
 };

@@ -3,7 +3,8 @@ export type ProjectSlug =
   | "cortex"
   | "frameground"
   | "aero"
-  | "voto";
+  | "voto"
+  | "saturn";
 
 export interface Project {
   name: string;
@@ -24,6 +25,29 @@ export interface Project {
 }
 
 export const Projects = [
+  {
+    name: "Saturn",
+    slug: "saturn",
+    image: {
+      url: "https://saturn.procrastinator.fyi/api/og?page=Saturn",
+      width: 1200,
+      height: 630,
+      alt: "Saturn",
+    },
+    urls: {
+      liveUrl: "https://saturn.procrastinator.fyi",
+      githubUrl: "https://github.com/phantomknight287/saturn",
+    },
+    tags: [
+      "Next.js",
+      "Typescript",
+      "Drizzle",
+      "PostgreSQL",
+      "Better Auth",
+      "Polar",
+      "Tailwind CSS",
+    ],
+  },
   {
     name: "Cortex Chat",
     slug: "cortex",
@@ -123,4 +147,5 @@ export const Projects = [
       "Chart.js",
     ],
   },
+
 ] as Project[];
