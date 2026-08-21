@@ -1,0 +1,265 @@
+---
+title: "Der Android-Bluetooth-SCO-Handshake"
+summary: "Was ich über den Bluetooth-SCO-Handshake gelernt habe, nachdem ich zwei Tage in diesem Kaninchenbau verbracht habe"
+date: 2026-08-21
+---
+
+> **Hinweis:** Dieser Text wurde von einem LLM aus dem Englischen übersetzt. Maßgeblich ist die englische Originalfassung – bei Ungereimtheiten in Formulierung oder Fachbegriffen bitte dort nachsehen.
+
+Ich arbeite an einer Chat-App und wollte kürzlich Sprachnachrichten von außerhalb der App hinzufügen – also die Möglichkeit, eine Sprachnachricht zu verschicken, ohne die App zu öffnen. Hinbekommen habe ich das, indem die App sich als Assist Service registriert, wodurch man sie anstelle des Google Assistant (jetzt Gemini, den ich hasse) als digitalen Assistenten auswählen kann.
+
+Der Ablauf sieht so aus:  
+Das Handy liegt in der Hosentasche und der Nutzer trägt Earbuds. Die App wurde vorher als digitaler Assistent ausgewählt. Der Nutzer löst die Assistenten-Geste an seinen Earbuds aus und Android öffnet die App. Die App hört das Mikrofon ab und schickt diese Sprachnachricht dann über die Leitung.
+
+Die App ist mit Flutter gebaut, also habe ich es zuerst in Flutter versucht, aber der Ablauf aus:  
+1. App-Thread hochfahren
+2. Die Interaktion von Kotlin an den App-Thread übergeben
+3. Warten, bis die Flutter-Engine initialisiert ist
+4. Mikrofon greifen und Aufnahme starten
+
+dauert auf meinem S21 FE (SND 888) über 9 Sekunden, was sehr lang ist und den Nutzer verwirren könnte, weil er nicht weiß, ob das Mikrofon gerade zuhört. Ich habe versucht, akustische Signale für Start und Ende der Aufnahme einzubauen, aber wenn ich sie auf dem Kotlin-Thread abspiele, ist das falsch, weil das Mikrofon erst lange danach aufgeht – und wenn ich sie über Dart abspiele, dauert es sowieso ewig. Also habe ich beschlossen, diesen ganzen Teil in Kotlin neu zu schreiben, weil das hier einfach am besten passte.
+
+Ein paar Docs gelesen, Claude ein bisschen gefragt, etwas getestet – und am Ende lief es. Ich habe es ausprobiert und es funktionierte tadellos. Oder etwa nicht?
+
+Mir fiel auf, dass das Mikrofon meines Handys benutzt wurde und nicht das der Earbuds. Was in Ordnung ist, wenn man das Handy in der Hand hält, aber eben nicht, wenn es in der Hosentasche steckt – und genau das war ja der Punkt, den ich lösen wollte.
+
+Also tiefer gegraben und herausgefunden, dass ich einen SCO(?)-Handshake mit den Earbuds durchführen muss. (Innerer Monolog: Okay, so schwer kann das nicht sein, und LANGSAM auch nicht … ich lag falsch.)
+
+Bevor wir wissen, wie dieser Handshake geht, müssen wir wissen, was SCO überhaupt ist.
+
+Bluetooth **SCO** steht für **Synchronous Connection Oriented** und ist ein Bluetooth-Protokoll für latenzarme, bidirektionale Sprachverbindungen in Mono. Daneben gibt es **A2DP (Advanced Audio Distribution Profile)**, das hochwertiges Stereo-Audio überträgt und Codecs wie SBC, AAC usw. unterstützt.
+
+Das ist dir sicher schon mal aufgefallen: Du hörst mit deinen Bluetooth-Kopfhörern Musik, gehst plötzlich in ein Telefonat und die Musik klingt dumpf und wird von Stereo zu Mono. Das ist dein Gerät, das von A2DP auf SCO umschaltet. Es tut das, weil A2DP eine Latenz von einigen 100 ms mitbringt – für Medienkonsum völlig in Ordnung, für Echtzeit-Informationen wie Sprachnachrichten aber eher nicht.
+
+Okay, ich habe mich also für SCO entschieden – warum dann dieser Blogpost? Gute Frage: weil der SCO-Handshake über 1 s dauert.
+
+## Warum ist das so langsam?
+
+Die Earbuds sitzen nicht untätig herum und warten auf dich. Sie haben bereits einen laufenden A2DP-Stream, und A2DP und SCO können sich das Funkmodul nicht wirklich brüderlich teilen. Wenn du also SCO anforderst, muss ungefähr Folgendes passieren:
+
+1. Android sagt dem Bluetooth-Stack, dass es eine Sprachverbindung will
+2. Der Stack baut den A2DP-Stream ab oder pausiert ihn
+3. Handy und Earbuds handeln die (e)SCO-Verbindung aus – welcher Codec (CVSD mit 8 kHz oder mSBC mit 16 kHz, wenn beide Seiten Wideband können), welcher Pakettyp, welches Wiederholungsfenster
+4. Die Verbindung steht, und erst jetzt fließt tatsächlich Audio in beide Richtungen
+
+Jeder dieser Schritte läuft über Funk, und Schritt 3 ist eine Aushandlung, kein Befehl. Billige Earbuds sind langsamer. Manche spielen außerdem ihr eigenes kleines „Ich wechsle in den Anrufmodus"-Geräusch ab, was noch mehr Verzögerung draufpackt. Bei meinen Buds pendelte sich das bei 800 ms bis 1,2 s ein, bei einem billigeren Paar, das ich getestet habe, ging es über 2 s.
+
+Es gibt also keinen Trick, um das schnell zu machen. Es ist ein physischer Handshake. Das Einzige, was du tun kannst: ihn so früh wie möglich anstoßen und ehrlich zum Nutzer sein, wann das Mikrofon wirklich live ist.
+
+## Aber beim Annehmen eines Anrufs merke ich keine Pause von über 1 s – ist das also Unsinn?
+
+<img src="https://media1.tenor.com/m/Pw74LOXbqA8AAAAC/misinformation-spreading.gif" className="rounded-md" />
+
+Genau das war auch mein Gedanke. Ich telefoniere täglich mit meinen Earbuds und da ist keine peinliche Sekunde Leere, wenn ich rangehe. Also stimmt entweder mein Timing nicht, oder da läuft noch etwas anderes.
+
+Es ist Letzteres. Android ist während eines Anrufs nicht schneller, es ist nur schlauer darin, *wann* es den Handshake macht. Jedes Telefonat hat bereits eine tote Phase eingebaut, und der SCO-Aufbau versteckt sich einfach darin.
+
+Denk mal darüber nach, was bei einem eingehenden Anruf tatsächlich passiert. Das Handy klingelt. Dieses Klingeln dauert keine Sekundenbruchteile, sondern mehrere Sekunden, in denen du das Handy aus der Tasche fischst, schaust, wer dran ist, und dich entscheidest. Der Telefonie-Stack sitzt derweil nicht untätig herum – er redet längst über HFP (Hands-Free Profile, das Schwesterprotokoll für die Anrufsteuerung) mit deinen Earbuds. Er hat ihnen bereits mitgeteilt, dass ein Anruf reinkommt – deshalb klingeln die Earbuds mit und deshalb funktioniert die Annehmen-Geste überhaupt. Wenn dein Finger also den Annehmen-Knopf trifft, steht die Audioverbindung entweder schon oder ist fast fertig.
+
+Bei ausgehenden Anrufen ist es noch großzügiger. Du wählst, und dann kommt der Verbindungsaufbau im Netz – IMS/VoLTE-Aushandlung, das Handy der Gegenseite muss klingeln, du hörst den Freizeichenton. Das sind mindestens ein paar Sekunden, in denen nichts übertragen werden muss und in denen die SCO-Verbindung still im Hintergrund hochkommt.
+
+Und selbst wenn etwas davon durchsickert: Der Anfang eines Telefonats hat per Konvention Puffer. Niemand steigt direkt mit einem ganzen Satz ein. Es ist „Hallo?" – „Hey, hörst du mich?". Fehlende 300 ms kosten dich da überhaupt nichts.
+
+Und jetzt vergleich das mit dem, was ich gebaut habe. Der Nutzer drückt einen Knopf an seinen Earbuds und fängt an zu reden. Das war's. Kein Klingeln, kein Wählen, kein Freizeichen, kein „Hallo?". Es gibt keine Lücke, in der sich der Handshake verstecken könnte, weil der ganze Sinn des Features ja gerade war, dass es keine Lücke gibt.
+
+Es ist also kein Unsinn, und Android macht auch nichts Cleveres mit dem Funkmodul. Die eine Sekunde ist immer da – Anrufe haben nur einen Ladebildschirm und mein Feature hatte keinen.
+
+## Den Handshake durchführen
+
+Es gibt hier zwei APIs, und welche du nimmst, hängt von deinem `minSdk` ab. Die alte ist `startBluetoothSco()`, in API 34 als veraltet markiert. Die neue ist `setCommunicationDevice()`, eingeführt in API 31.
+
+Zuerst die Berechtigungen in der `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+```
+
+`RECORD_AUDIO` und `BLUETOOTH_CONNECT` sind Laufzeitberechtigungen, du musst sie also anfragen. Da mein Ablauf durch eine Assistenten-Geste bei geschlossener App startet, frage ich beide beim ersten Öffnen der App ab und breche mit einer gesprochenen Fehlermeldung ab, falls sie nie erteilt wurden.
+
+### Der neue Weg (API 31+)
+
+```kotlin
+private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+@RequiresApi(Build.VERSION_CODES.S)
+private fun routeToBluetooth(): Boolean {
+    val sco = audioManager.availableCommunicationDevices
+        .firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+        ?: return false // keine Earbuds mit Mikrofon verbunden, zurück auf das Handy-Mikrofon
+
+    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+    return audioManager.setCommunicationDevice(sco)
+}
+```
+
+Und jetzt der wichtige Teil: Wenn `setCommunicationDevice()` `true` zurückgibt, heißt das **nicht**, dass das Audio geroutet ist. Es heißt, dass die Anfrage angenommen wurde. Wenn du hier direkt mit der Aufnahme startest, bekommst du erst das Handy-Mikrofon und danach eine Audio-Pause, so lange die Aushandlung eben dauert – genau der Bug, den ich in einem anderen Feature der App hatte. Du musst auf den Callback warten:
+
+```kotlin
+@RequiresApi(Build.VERSION_CODES.S)
+suspend fun waitForBluetoothRoute(timeoutMs: Long = 3000): Boolean =
+    withTimeoutOrNull(timeoutMs) {
+        suspendCancellableCoroutine { cont ->
+            val listener = object : AudioManager.OnCommunicationDeviceChangedListener {
+                override fun onCommunicationDeviceChanged(device: AudioDeviceInfo?) {
+                    if (device?.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
+                        audioManager.removeOnCommunicationDeviceChangedListener(this)
+                        if (cont.isActive) cont.resume(true)
+                    }
+                }
+            }
+            audioManager.addOnCommunicationDeviceChangedListener(
+                context.mainExecutor,
+                listener
+            )
+            cont.invokeOnCancellation {
+                audioManager.removeOnCommunicationDeviceChangedListener(listener)
+            }
+
+            // war schon geroutet, bevor wir den Listener angehängt haben
+            if (audioManager.communicationDevice?.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
+                audioManager.removeOnCommunicationDeviceChangedListener(listener)
+                if (cont.isActive) cont.resume(true)
+            }
+        }
+    } ?: false
+```
+
+Diese letzte Prüfung ist wichtig. Wenn das Gerät bereits auf SCO war (etwa weil der Nutzer die Geste zweimal ausgelöst hat), feuert der Callback nie und du sitzt den kompletten Timeout ab.
+
+### Der alte Weg (unter API 31)
+
+```kotlin
+@Suppress("DEPRECATION")
+suspend fun startScoLegacy(timeoutMs: Long = 3000): Boolean {
+    if (!audioManager.isBluetoothScoAvailableOffCall) return false
+
+    return withTimeoutOrNull(timeoutMs) {
+        suspendCancellableCoroutine { cont ->
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context, intent: Intent) {
+                    val state = intent.getIntExtra(
+                        AudioManager.EXTRA_SCO_AUDIO_STATE,
+                        AudioManager.SCO_AUDIO_STATE_ERROR
+                    )
+                    when (state) {
+                        AudioManager.SCO_AUDIO_STATE_CONNECTED -> {
+                            context.unregisterReceiver(this)
+                            if (cont.isActive) cont.resume(true)
+                        }
+                        AudioManager.SCO_AUDIO_STATE_ERROR,
+                        AudioManager.SCO_AUDIO_STATE_DISCONNECTED -> {
+                            context.unregisterReceiver(this)
+                            if (cont.isActive) cont.resume(false)
+                        }
+                    }
+                }
+            }
+
+            ContextCompat.registerReceiver(
+                context,
+                receiver,
+                IntentFilter(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            cont.invokeOnCancellation { runCatching { context.unregisterReceiver(receiver) } }
+
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager.startBluetoothSco()
+            audioManager.isBluetoothScoOn = true
+        }
+    } ?: false
+}
+```
+
+Beachte `isBluetoothScoAvailableOffCall`. SCO außerhalb eines Telefonats ist technisch optional und der Hersteller kann es abschalten. Auf so ziemlich jedem Handy, das ich in die Finger bekommen habe (waren alles Samsungs, also keine Ahnung), war es `true`, aber die Prüfung kostet nichts.
+
+Und ruf `startBluetoothSco()` nicht zweimal auf, ohne vorher zu stoppen. Der Zähler im `AudioManager` kommt durcheinander und am Ende hast du eine Verbindung, die du nicht mehr abbauen kannst, bis der Prozess stirbt.
+
+### Aufnehmen
+
+Sobald die Route steht, nimmst du mit der *Communication*-Audioquelle auf, nicht mit `MIC`:
+
+```kotlin
+private const val SAMPLE_RATE = 16_000
+
+@SuppressLint("MissingPermission")
+fun createRecorder(): AudioRecord {
+    val minBuffer = AudioRecord.getMinBufferSize(
+        SAMPLE_RATE,
+        AudioFormat.CHANNEL_IN_MONO,
+        AudioFormat.ENCODING_PCM_16BIT
+    )
+    return AudioRecord(
+        MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+        SAMPLE_RATE,
+        AudioFormat.CHANNEL_IN_MONO,
+        AudioFormat.ENCODING_PCM_16BIT,
+        minBuffer * 2
+    )
+}
+```
+
+`VOICE_COMMUNICATION` gibt dir die Echounterdrückung und Rauschunterdrückung der Plattform gratis dazu, und die willst du haben, weil ein SCO-Mikrofon an Earbuds ohnehin nicht großartig ist. Und erwarte hier keine Studioqualität – wenn die Verbindung CVSD ausgehandelt hat, bekommst du 8 kHz in Mono, Ende der Geschichte. Mit mSBC sind es 16 kHz. So oder so ist das ein Telefonmikrofon, es muss nur verständlich sein.
+
+### Aufräumen
+
+Das ist der Teil, den ich zuerst falsch gemacht habe – und mich dann gewundert habe, warum meine Musik den Rest des Tages in Mono lief:
+
+```kotlin
+fun releaseAudio() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        audioManager.clearCommunicationDevice()
+    } else {
+        @Suppress("DEPRECATION")
+        audioManager.isBluetoothScoOn = false
+        @Suppress("DEPRECATION")
+        audioManager.stopBluetoothSco()
+    }
+    audioManager.mode = AudioManager.MODE_NORMAL
+}
+```
+
+Pack das in einen `finally`-Block. Wenn dein Prozess mitten in der Aufnahme abgeschossen wird, räumt das System normalerweise für dich auf – aber „normalerweise" leistet in diesem Satz sehr viel Arbeit. Das Handy in `MODE_IN_COMMUNICATION` zu hinterlassen, bringt außerdem die Lautstärketasten durcheinander – sie regeln dann die Gesprächs- statt der Medienlautstärke – und das merken Nutzer garantiert. Oder auch nicht, weil das hier ja nicht iOS ist, wo jede Lautstärke zusammengelegt ist (lmao).
+
+## Alles zusammen
+
+Die Reihenfolge, die bei mir am Ende funktioniert hat:
+
+```kotlin
+suspend fun captureVoiceNote(): ByteArray? {
+    val routed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        routeToBluetooth() && waitForBluetoothRoute()
+    } else {
+        startScoLegacy()
+    }
+
+    // routed == false heißt nur, dass wir auf dem Handy-Mikrofon sind, nicht dass wir gescheitert sind
+    if (!routed) Log.w(TAG, "SCO nicht verfügbar, nutze Handy-Mikrofon")
+
+    return try {
+        playEarcon(START)   // erst jetzt, nachdem sich die Route gesetzt hat
+        record()
+    } finally {
+        playEarcon(STOP)
+        releaseAudio()
+    }
+}
+```
+
+Die zwei Dinge daraus, die es wert sind, geklaut zu werden:
+
+**Stoß den Handshake vor allem anderen an.** Er ist das langsamste Glied in der Kette und läuft im Bluetooth-Stack, nicht auf deinem Thread. Also feuere ihn zuerst ab und erledige deinen restlichen Setup-Kram (Puffer, Datei-Handles, was auch immer), während das Funkmodul verhandelt. Das hat mir ein paar hundert Millisekunden geschenkt.
+
+**Spiel das Startsignal ab, nachdem die Route bestätigt ist, nicht davor.** Das war überhaupt der Grund, warum ich das Ganze in Kotlin neu geschrieben habe. Das Signal ist ein Versprechen an den Nutzer, dass das Mikrofon live ist. Wenn du es abspielst, während SCO noch verbindet, wird das erste Wort verschluckt und der Nutzer merkt nichts davon. Spielst du es danach ab, liegt zwischen Geste und Piepton rund eine Sekunde, was sich langsam anfühlt – aber langsam und korrekt schlägt schnell und gelogen.
+
+Und wenn der Handshake in den Timeout läuft, scheitere ich nicht. Ich nehme einfach über das Handy-Mikrofon auf und lasse es eine schlechtere Sprachnachricht sein. Eine leise Sprachnachricht ist besser als gar keine.
+
+## Das Wichtigste in Kürze
+
+- Ein `true` von `setCommunicationDevice()` ist eine Anfrage, keine Bestätigung. Warte auf den Callback.
+- Immer einen Timeout haben, und immer einen Fallback-Pfad. Manche Earbuds kommen einfach nie hoch.
+- Räum in `finally` auf, auf wirklich jedem Pfad.
+
+Zwei Tage für das, was im Kern „warte auf einen Callback, statt es anzunehmen" ist. Hat sich aber gelohnt – das Feature läuft, und jetzt weiß ich, was SCO ist.

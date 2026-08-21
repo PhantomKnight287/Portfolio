@@ -58,12 +58,6 @@ export async function generateMetadata(props: {
   };
 }
 
-function getProjectSummaryString(
-  project: (typeof Projects)[number]
-): `Projects.${string}.summary` {
-  return `Projects.${project.slug}.summary` as const;
-}
-
 export default async function Home() {
   const t = await getTranslations();
   const locale = await getLocale();
@@ -114,7 +108,7 @@ export default async function Home() {
           </Badge>
           .
         </p>
-        {locale == "de" ? (
+        {locale === "de" ? (
           <>
             <p className="mt-5 text-xl text-gray-400">
               Notiz: Ich lerne Deutsch und habe beschlossen, mein Portfolio zur
@@ -158,7 +152,7 @@ export default async function Home() {
         </div>
         <div className="w-full h-[1px] "></div>
         <div className="mt-5">
-          <h1 className="text-2xl text-white mt-5 mb-5">
+          <h1 className="text-2xl text-white mt-5">
             {t("Projects.title")}
           </h1>
           <div className="flex flex-col">
@@ -183,7 +177,7 @@ export default async function Home() {
           </div>
         </div>
         <div className="mt-5">
-          <h1 className="text-2xl text-white mt-5 mb-5">Writings</h1>
+          <h1 className="text-2xl text-white mt-5 mb-0">Writings</h1>
           <div className="flex flex-col">
             {[
               ...(locale === "en" ? allEnglishWritings : allGermanWritings),
