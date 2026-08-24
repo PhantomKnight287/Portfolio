@@ -1,7 +1,7 @@
 {
 	"HomePage": {
 		"currently": "Momentan arbeite ich in einem Firma und nutzen",
-		"description": "Ich bin Gurpal Singh, ein {age}-jähriger Entwickler, der in Indien lebt. Ich bin ein autodidaktischer Entwickler, der gerne programmiert und Dinge herstellt.",
+		"description": "Ein {age}-jähriger autodidaktischer Entwickler aus Indien, der gerne programmiert und Dinge herstellt.",
 		"learning": "und lerne",
 		"summary": "Ich bin ein Full Stack Web und App Entwickler aus Indien.",
 		"tagline": "Ich erstelle"
@@ -32,5 +32,9 @@
 			"description": "Eine Echtzeit-Abstimmungsplattform, auf der sich Organisationen registrieren und Junior-Admins erstellen können, um Umfragen zu erstellen und zu verwalten, Kandidaten zu registrieren und ihnen die Teilnahme an bestimmten Umfragen zu ermöglichen. Wähler können sich registrieren und für ihre Lieblingskandidaten stimmen und eine Echtzeitgrafik der Ergebnisse anzeigen. Im ersten Monat nach der Einführung wurde die Plattform von 3.000 Wählern genutzt und über 7.000 Stimmen abgegeben.(Google übersetzt)",
 			"summary": "Live-Abstimmungs-App"
 		}
+	},
+	"WritingsPage": {
+		"description": "Notizen und Artikel über die Dinge, die ich baue und kaputt mache — Web, Mobile und alles dazwischen.",
+		"title": "Texte"
 	}
 }

@@ -23,13 +23,14 @@ export default function LocaleSelector() {
     <select
       value={locale}
       onChange={handleLocaleChange}
-      className="bg-transparent text-gray-400 text-sm border-none outline-none cursor-pointer"
+      aria-label="Language"
+      className="cursor-pointer rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-400 outline-none hover:text-neutral-100"
     >
       {locales.map((locale) => (
         <option
           key={locale.code}
           value={locale.code}
-          className="bg-gray-800 text-white"
+          className="bg-neutral-900 text-neutral-100"
         >
           {locale.name}
         </option>

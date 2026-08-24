@@ -16,44 +16,60 @@ import { Link } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Metadata } from "next";
 import { EffectTS } from "@/icons/effect";
+import { SITE_URL } from "@/lib/og";
+
+const BIRTH_DATE = "2005-04-30";
+
+function age(): number {
+  return Math.floor(
+    (Date.now() - new Date(BIRTH_DATE).getTime()) /
+      (1000 * 60 * 60 * 24 * 365.25),
+  );
+}
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await props.params;
-  const t = await getTranslations({ locale: locale });
+  const t = await getTranslations({ locale });
+
+  const title = "Gurpal Singh | PhantomKnight287";
+  const description = `${t("HomePage.summary")} ${t("HomePage.description", {
+    age: age(),
+  })}`;
 
   return {
-    title: "Gurpal Singh | PhantomKnight287",
-    description: t("HomePage.summary"),
+    // Absolute so the layout's "%s | Gurpal Singh" template does not repeat the name.
+    title: { absolute: title },
+    description,
+    keywords: [
+      "Gurpal Singh",
+      "PhantomKnight287",
+      "Full Stack Developer",
+      "Next.js",
+      "Nest.js",
+      "React",
+      "Flutter",
+      "TypeScript",
+      "Portfolio",
+    ],
+    alternates: {
+      canonical: `${SITE_URL}/${locale}`,
+      languages: { en: "/en", de: "/de" },
+    },
     openGraph: {
-      title: "Gurpal Singh | PhantomKnight287",
-      description: t("HomePage.summary"),
+      title,
+      description,
       type: "website",
-      url: "https://phantomknight287.github.io/",
-      siteName: "Gurpal Singh | PhantomKnight287",
-      images: [
-        {
-          url: "https://github.com/phantomknight287.png",
-          width: 200,
-          height: 200,
-          alt: "PhantomKnight287",
-        },
-      ],
+      url: `${SITE_URL}/${locale}`,
+      siteName: title,
     },
     twitter: {
-      site: "@PhantomKnight287",
-      title: "Gurpal Singh | PhantomKnight287",
-      description: t("HomePage.summary"),
       card: "summary_large_image",
-      creator: "gurpalsingh287",
-      images: [
-        {
-          url: "https://github.com/phantomknight287.png",
-          width: 200,
-          height: 200,
-        },
-      ],
+      site: "@PhantomKnight287",
+      creator: "@PhantomKnight287",
+      title,
+      description,
     },
   };
 }
@@ -70,12 +86,7 @@ export default async function Home() {
           <Transition />
         </h1>
         <p className="mt-5 text-xl text-gray-400">
-          {t("HomePage.description", {
-            age: Math.floor(
-              (new Date().getTime() - new Date("2005-04-30").getTime()) /
-                (1000 * 60 * 60 * 24 * 365.25)
-            ),
-          })}
+          {t("HomePage.description", { age: age() })}
         </p>
         <p className="mt-5 text-xl text-gray-400">
           {t("HomePage.currently")}{" "}
@@ -97,7 +108,7 @@ export default async function Home() {
             Effect
           </Badge>
           ,{" "}
-          <Badge href="https://grafana.com/" className="ml-10">
+          <Badge href="https://grafana.com/">
             <Grafana className="inline-block mr-1" />
             Grafana
           </Badge>{" "}
@@ -118,12 +129,12 @@ export default async function Home() {
         ) : null}
 
         <div className="flex items-start mt-5 w-full justify-start flex-col">
-           <div className="flex flex-row items-center justify-start">
-              <div className="aspect-square flex-none h-[10px] overflow-hidden relative w-2.5 will-change-transform bg-green-500 rounded-full"></div>
-              <div className="flex flex-col justify-start shrink-0 opacity-100 ml-2 ">
-                <p className="text-white">Available for new opportunities</p>
-              </div>
+          <div className="flex flex-row items-center justify-start">
+            <div className="aspect-square flex-none h-[10px] overflow-hidden relative w-2.5 will-change-transform bg-green-500 rounded-full"></div>
+            <div className="flex flex-col justify-start shrink-0 opacity-100 ml-2 ">
+              <p className="text-white">Available for new opportunities</p>
             </div>
+          </div>
           <br />
           <div className="flex flex-row mt-3 gap-3">
             <a
@@ -152,9 +163,7 @@ export default async function Home() {
         </div>
         <div className="w-full h-[1px] "></div>
         <div className="mt-5">
-          <h1 className="text-2xl text-white mt-5">
-            {t("Projects.title")}
-          </h1>
+          <h1 className="text-2xl text-white mt-5">{t("Projects.title")}</h1>
           <div className="flex flex-col">
             {Projects.map((project) => (
               <Link
@@ -179,23 +188,23 @@ export default async function Home() {
         <div className="mt-5">
           <h1 className="text-2xl text-white mt-5 mb-0">Writings</h1>
           <div className="flex flex-col">
-            {[
-              ...(locale === "en" ? allEnglishWritings : allGermanWritings),
-            ].map((writing) => (
-              <Link
-                className="proj group"
-                key={writing._meta.path}
-                href={`/writings/${writing._meta.path}`}
-              >
-                <article className="flex flex-row gap-0 items-start justify-between lg:justify-start mt-1 mb-1 w-full overflow-hidden">
-                  <div className="flex flex-row gap-2 justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto mr-3">
-                    <h1 className="text-lg leading-[1.3em] text-left text-gray-300 group-hover:text-white inline-flex underline line-clamp-1 overflow-ellipsis">
-                      {writing.title}
-                    </h1>
-                  </div>
-                </article>
-              </Link>
-            ))}
+            {[...(locale === "en" ? allEnglishWritings : allGermanWritings)]
+              .sort((a, b) => b.date.getTime() - a.date.getTime())
+              .map((writing) => (
+                <Link
+                  className="proj group"
+                  key={writing._meta.path}
+                  href={`/writings/${writing._meta.path}`}
+                >
+                  <article className="flex flex-row gap-0 items-start justify-between lg:justify-start mt-1 mb-1 w-full overflow-hidden">
+                    <div className="flex flex-row gap-2 justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto mr-3">
+                      <h1 className="text-lg leading-[1.3em] text-left text-gray-300 group-hover:text-white inline-flex underline line-clamp-1 overflow-ellipsis">
+                        {writing.title}
+                      </h1>
+                    </div>
+                  </article>
+                </Link>
+              ))}
           </div>
         </div>
       </div>

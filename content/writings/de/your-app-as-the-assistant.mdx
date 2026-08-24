@@ -1,0 +1,234 @@
+---
+title: "Deine App als Assistent"
+summary: "Was ich über Androids Assist Service gelernt habe und wie du deine App Gemini ersetzen lässt"
+date: 2026-08-23
+---
+
+> **Hinweis:** Dieser Text wurde von einem LLM aus dem Englischen übersetzt. Maßgeblich ist die englische Originalfassung – bei Ungereimtheiten in Formulierung oder Fachbegriffen bitte dort nachsehen.
+
+Da ich an Sprachnachrichten von außerhalb der App gearbeitet habe, wie im [vorherigen Text](/writings/android-bt-sco-handshake) erwähnt: Dieses Feature funktioniert, indem die App deinen Google Assistant ersetzt, sodass Android statt Gemini eben deine App öffnet.
+
+Zeit, darüber zu labern, wie du deine App als Assist-App registrierst, damit du Gemini durch etwas anderes ersetzen kannst, einfach weil es geht (grinst in Richtung der iOS-Nutzer, die mit Siri festsitzen, lmao).
+
+Android lässt dich das tatsächlich machen, ohne Root oder Signature Permission oder sonst was. Du deklarierst ein paar Services, der Nutzer wählt deine App in den Einstellungen aus, fertig. Die Docs dazu sind allerdings ziemlich dünn, und wenn du etwas falsch machst, sagt dir das keiner, deine App taucht einfach nicht in der Liste auf und du sitzt da und rätselst.
+
+Damit deine App unter dem "Digitaler Assistent"-Menü auftaucht (keine Ahnung, wie andere Hersteller das nennen, bei mir zu Hause gibt es nur Samsung), brauchst du 3 Dinge:
+
+1. einen `VoiceInteractionService`
+2. einen `VoiceInteractionSessionService`
+3. einen `RecognitionService`
+
+Zwei davon machen so gut wie nichts, du brauchst trotzdem alle drei, ich habe versucht, welche wegzulassen.
+
+Gehen wir sie einzeln durch.
+
+### 1. VoiceInteractionService
+
+Das ist der eigentliche Service, der deine App als digitale Assistenten-App markiert. Danach sucht Android, wenn es diese Einstellungsliste zusammenbaut. Du musst hier keine Methode überschreiben, der Klassenrumpf ist leer.
+
+### 2. VoiceInteractionSessionService
+
+Das ist der Service, den Android aufruft, wenn eine neue Voice Interaction Session erzeugt wird, was im Grunde heißt: Der Nutzer hat die Assistenten-Geste ausgelöst. Du musst die Methode `onNewSession` überschreiben und sie muss eine Instanz von `VoiceInteractionSession` zurückgeben.
+
+Was ist `VoiceInteractionSession`?
+Sie repräsentiert eine aktive Voice-Interaction-Session, bekommt `Context` als Parameter und hat eine `onShow`-Methode. `onShow` wird aufgerufen, wenn die Session-UI angezeigt werden soll. So wie Gemini sein eigenes Zuhör-Dings einblendet.
+
+Wenn du deine eigene UI bauen willst, überschreibst du `onCreateContentView`, denn diese Methode kommt vor `onShow`. Und wenn du gar keine UI willst (mein Fall, das Handy liegt in der Hosentasche), kannst du `hide()` aufrufen und einfach dein Ding machen, ohne irgendwas anzuzeigen.
+
+Es gibt außerdem `onHandleAssist` und `onHandleScreenshot`, falls du den Inhalt des aktuellen Bildschirms oder einen Screenshot davon haben willst, so funktioniert das ganze "was ist gerade auf meinem Bildschirm"-Zeug. Du bekommst sie nur, wenn du es in der XML-Config anforderst, und der Nutzer kann es in den Einstellungen sowieso abschalten. Ich brauchte beides nicht, also habe ich sie ausgelassen.
+
+### 3. RecognitionService
+
+Das ist ein Spracherkenner, falls du eine echte Assistenten-App baust. Er hat `onStartListening`, `onCancel` und `onStopListening`. Wenn deine App aber keine Spracherkennung macht, kannst du im Listener-Callback einfach `SpeechRecognizer.ERROR_CLIENT` durchreichen, um dich als "nicht verfügbar" zu melden.
+
+Weglassen kannst du ihn trotzdem nicht, selbst wenn du nie irgendwas transkribierst, denn die Voice-Interaction-XML zwingt dich, einen Recognition Service zu benennen, das ist nicht optional. Lässt du ihn weg, taucht deine App einfach nicht in der Assistenten-Liste auf, kein Fehler, kein Log, nichts.
+
+# Setup
+
+Ich nenne meine App `NotGoogleAssistant` mit der Bundle-ID `fyi.procrastinator.not.google.assistant`
+
+1. `VoiceInteractionSession` erweitern
+
+```kotlin
+
+package fyi.procrastinator.not.google.assistant
+
+import android.content.Context
+import android.os.Bundle
+import android.service.voice.VoiceInteractionSession
+
+class NotGoogleAssistantVoiceInteractionSession(context:Context):
+    VoiceInteractionSession(context){
+      override fun onShow(args: Bundle?, showFlags: Int) {
+        super.onShow(args, showFlags)
+
+       /**
+       * Was auch immer beim Start der Voice Interaction Session passieren soll, kommt hier rein.
+       * Zum Beispiel ein akustisches Signal abspielen oder keine Ahnung, den Nutzer rickrollen.
+       * Oder du erweiterst einfach `Activity` und startest diese Activity
+       */
+
+        hide()
+    }
+
+
+}
+```
+
+Zwei Dinge an dieser Klasse, über die ich gestolpert bin:
+
+`hide()` beendet die Session, alles also, was du in `onShow` angestoßen hast und von dem du erwartest, dass es weiterläuft, lebt auf geliehene Zeit. Meine Aufnahme dauert eine Weile, deshalb habe ich sie in einen Foreground Service verschoben, statt sie hier drin zu lassen.
+
+Und `onShow` läuft auf dem Main Thread. Blockierst du ihn, fühlt sich die Geste kaputt an und der Nutzer gibt deiner App die Schuld, zu Recht.
+
+2. `VoiceInteractionSessionService` anlegen
+
+```kotlin
+package fyi.procrastinator.not.google.assistant
+
+import android.os.Bundle
+import android.service.voice.VoiceInteractionSession
+import android.service.voice.VoiceInteractionSessionService
+
+class NotGoogleAssistantVoiceInteractionSessionService : VoiceInteractionSessionService() {
+    override fun onNewSession(args: Bundle?): VoiceInteractionSession =
+        NotGoogleAssistantVoiceInteractionSession(this)
+}
+
+```
+
+3. `VoiceInteractionService` erweitern
+
+```kotlin
+package fyi.procrastinator.not.google.assistant
+
+import android.service.voice.VoiceInteractionService
+
+class NotGoogleAssistantVoiceInteractionService : VoiceInteractionService()
+
+```
+
+4. Einen Stub-`RecognitionService` anlegen
+   Da diese App keine echte Spracherkennung braucht, sondern nur Audio entgegennehmen muss, baue ich einen Stub-`RecognitionService`
+
+```kotlin
+
+package fyi.procrastinator.not.google.assistant
+
+import android.content.Intent
+import android.speech.RecognitionService
+import android.speech.SpeechRecognizer
+
+class NotGoogleAssistantRecognitionService : RecognitionService() {
+    override fun onStartListening(recognizerIntent: Intent?, listener: Callback?) {
+        listener?.error(SpeechRecognizer.ERROR_CLIENT)
+    }
+
+    override fun onCancel(listener: Callback?) {}
+
+    override fun onStopListening(listener: Callback?) {}
+}
+```
+
+Jetzt zum pikanten Android-Manifest-Kram.
+
+```xml
+
+        <service
+            android:name=".NotGoogleAssistantVoiceInteractionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".NotGoogleAssistantVoiceInteractionSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <service
+            android:name=".NotGoogleAssistantRecognitionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_RECOGNITION_SERVICE">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+```
+
+Alle drei brauchen `android:exported="true"`, weil sich der Systemprozess an sie bindet und nicht du. Die `android:permission`-Zeilen bedeuten, dass sich nur etwas mit `BIND_VOICE_INTERACTION` binden darf, also das OS, und ohne sie akzeptiert Android den Service ohnehin nicht.
+
+Und der Session Service hat keinen Intent Filter, das ist so richtig, er wird über die XML-Config weiter unten erreicht und nicht über eine Action. Ich hatte ihm beim ersten Mal einen gegeben, weil es ohne falsch aussah. Er bewirkt nichts.
+
+Die Ressourcen-XML:
+
+1. `voice_interaction_service.xml`
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="fyi.procrastinator.not.google.assistant.NotGoogleAssistantVoiceInteractionSessionService"
+    android:recognitionService="fyi.procrastinator.not.google.assistant.NotGoogleAssistantRecognitionService"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="true" />
+```
+
+Vorsicht bei diesen beiden Klassennamen, das sind voll qualifizierte Strings, der Compiler prüft sie also nicht und Lint auch nicht. Vertippst du dich bei einem, läuft der Build trotzdem durch und deine App taucht einfach nicht in den Einstellungen auf. Ich hatte `NotGoogleAssitant` statt `NotGoogleAssistant` getippt und viel zu lange gebraucht, bis es mir aufgefallen ist.
+
+`supportsAssist="true"` ist das, was dich überhaupt erst als Assistent qualifiziert statt nur als irgendein Voice-Interaction-Ding, ohne das tauchst du im Auswahldialog nicht auf.
+
+`supportsLaunchVoiceAssistFromKeyguard="true"` sorgt dafür, dass die Geste auch bei gesperrtem Handy funktioniert, was ich brauchte, weil der ganze Sinn ja war, dass das Handy in der Hosentasche bleibt. Gut zu wissen: Das heißt nicht, dass das Handy entsperrt ist, alles dort läuft also auf dem Sperrbildschirm und der Dateizugriff kann bis zum ersten Entsperren weiterhin blockiert sein.
+
+2. `recognition_service.xml`
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<recognition-service xmlns:android="http://schemas.android.com/apk/res/android" />
+```
+
+Leeres Tag, es muss nur existieren, damit die Meta-Data auf irgendetwas zeigen kann.
+
+## Das Ganze scharf schalten
+
+Die App zu installieren macht dich noch nicht zum Assistenten, der Nutzer muss dich auswählen. Bei Samsung ist das Einstellungen > Apps > Standard-Apps > Digitaler Assistent. Auf Stock-Android ist es Einstellungen > Apps > Assistent & Spracheingabe. Andere Hersteller packen es natürlich woandershin.
+
+Statt eine 5-Schritte-Anleitung ins Onboarding zu schreiben, kannst du sie einfach direkt dorthin schicken:
+
+```kotlin
+fun openAssistantSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+        .onFailure {
+            // manche Hersteller haben diesen Screen nicht, also zurück auf die oberste Ebene
+            context.startActivity(
+                Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+}
+```
+
+Behalt das `runCatching` drin, es gibt immer irgendein Gerät, auf dem es diesen Screen nicht gibt.
+
+Und um zu prüfen, ob gerade du ausgewählt bist, praktisch für einen "wähl mich als deinen Assistenten"-Hinweis, ohne die zu nerven, die das längst gemacht haben:
+
+```kotlin
+fun isDefaultAssistant(context: Context): Boolean {
+    val current = Settings.Secure.getString(context.contentResolver, "voice_interaction_service")
+    return current?.startsWith(context.packageName) == true
+}
+```
+
+Dieser Key ist keine öffentliche API, sondern nur ein Settings-String, der seit Ewigkeiten stabil ist. Nimm ihn für die UI, häng keine echte Logik davon ab. Kommt null zurück, zeig einfach den Hinweis.
+
+## Zeug, das mich Zeit gekostet hat
+
+**App taucht gar nicht in der Liste auf.** Fast immer ein vertippter Klassenname in `voice_interaction_service.xml`. Ansonsten ein fehlendes `supportsAssist`, fehlendes `exported` oder kein deklarierter Recognition Service. `adb logcat | grep -i voiceinteraction`, während du diesen Einstellungs-Screen öffnest, zeigt meistens darauf.
+
+**App ist in der Liste, aber sie auszuwählen bewirkt nichts.** Der Session Service ist nicht auflösbar, oder ihm fehlt `BIND_VOICE_INTERACTION`, sodass sich das System weigert, sich daran zu binden.

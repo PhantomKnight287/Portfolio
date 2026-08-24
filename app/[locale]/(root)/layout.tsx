@@ -1,6 +1,6 @@
+import LocaleSelector from "@/components/locale-selector";
 import Image from "next/image";
 import Link from "next/link";
-import LocaleSelector from "./layout.client";
 
 export default function RootLayout({
   children,

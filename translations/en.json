@@ -1,7 +1,7 @@
 {
 	"HomePage": {
-		"currently": "Currently working in a company and messing with",
-		"description": "I'm Gurpal Singh, a {age} year old developer living in India. I am a self-taught developer who loves to code and make things.",
+		"currently": "Currently working with",
+		"description": "A {age} year old self-taught developer living in India, who loves to code and make things.",
 		"learning": "and learning",
 		"summary": "I am a Full Stack Web and App Developer from India.",
 		"tagline": "I make"
@@ -32,5 +32,9 @@
 			"description": "A realtime voting platform where organisations can register and create junior admins to create and manage polls, register candidates and allow them to participate in certain polls, voters can register and vote for their favourite candidates and view a realtime graph of the results. Used by 3000 voters and over 7000 votes casted in the first 1 month of launch.",
 			"summary": "Live voting app"
 		}
+	},
+	"WritingsPage": {
+		"description": "Notes and articles on the things I build and break — web, mobile and everything in between.",
+		"title": "Writings"
 	}
 }
