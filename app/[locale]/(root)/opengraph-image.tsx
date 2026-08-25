@@ -20,7 +20,7 @@ import de from "@/translations/de.json";
 export const runtime = "edge";
 export const contentType = "image/png";
 export const size = OG_SIZE;
-export const alt = "Gurpal Singh — Full Stack Web and App Developer";
+export const alt = "Gurpal Singh - Full Stack Web and App Developer";
 
 const MESSAGES: Record<string, typeof en> = { en, de: de as typeof en };
 

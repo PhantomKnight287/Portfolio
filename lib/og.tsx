@@ -202,7 +202,7 @@ export function OgBadge(props: { children: ReactNode }) {
 
 /**
  * The Next.js mark from icons/next.tsx, minus the `mask` and the two white
- * gradients — Satori renders neither, so the app icon comes out blank here.
+ * gradients - Satori renders neither, so the app icon comes out blank here.
  * Same geometry, solid white fills.
  */
 export function NextMark(props: SVGProps<SVGSVGElement>) {

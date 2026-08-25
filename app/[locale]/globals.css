@@ -9,3 +9,8 @@ body {
 .image__container img {
   position: unset !important;
 }
+
+
+.prose p>code{
+    @apply break-words;
+}
