@@ -14,3 +14,19 @@ body {
 .prose p>code{
     @apply break-words;
 }
+
+/* Long words (and unbroken URLs) used to push the article past the viewport on
+   narrow screens. Hyphenate prose text so overlong words split with a dash, and
+   hard-break whatever is still too long to fit. `lang` is set on <html>, so
+   `hyphens: auto` picks the right dictionary for en/de. */
+.prose :is(p, li, dd, dt, blockquote, figcaption, h1, h2, h3, h4, h5, h6) {
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+
+/* Never hyphenate code: an inserted dash reads as part of the identifier. */
+.prose :is(code, pre, kbd, samp) {
+  -webkit-hyphens: none;
+  hyphens: none;
+}

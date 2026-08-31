@@ -79,7 +79,7 @@ export default async function Home() {
   const locale = await getLocale();
 
   return (
-    <div className="flex mt-5 flex-col max-w-[600px] mx-auto p-5 lg:p-0">
+    <div className="flex mt-5 flex-col max-w-[720px] mx-auto p-5 lg:p-0">
       <div className="container">
         <h1 className="text-xl font-bold text-gray-400">
           <span className="">{t("HomePage.tagline")}</span>
@@ -197,8 +197,8 @@ export default async function Home() {
                   href={`/writings/${writing._meta.path}`}
                 >
                   <article className="flex flex-row gap-0 items-start justify-between lg:justify-start mt-1 mb-1 w-full overflow-hidden">
-                    <div className="flex flex-row gap-2 justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto mr-3">
-                      <h1 className="text-lg leading-[1.3em] text-left text-gray-300 group-hover:text-white inline-flex underline line-clamp-1 overflow-ellipsis">
+                    <div className="flex flex-row gap-2 justify-start opacity-100 min-w-0 h-auto relative mr-3">
+                      <h1 className="text-lg leading-[1.3em] text-left text-gray-300 group-hover:text-white underline truncate">
                         {writing.title}
                       </h1>
                     </div>

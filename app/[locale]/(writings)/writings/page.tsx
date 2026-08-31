@@ -57,15 +57,15 @@ export default async function WritingsPage() {
     Date.now() - date.getTime() < 1000 * 60 * 60 * 24 * 30;
 
   return (
-    <div className="pt-10 pb-16 flex flex-col items-center justify-center">
-      <div className="max-w-[600px]">
+    <div className="w-full px-5  pt-0 md:pt-16 pb-16 flex flex-col items-center justify-center">
+      <div className="w-full max-w-[720px]">
         <div className="flex items-center justify-between gap-3 w-full">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-100"
           >
             <BiArrowBack />
-            Back
+            {t("WritingsPage.back")}
           </Link>
         </div>
 
@@ -80,8 +80,8 @@ export default async function WritingsPage() {
               key={writing._meta.path}
               href={`/writings/${writing._meta.path}`}
             >
-              <span className="flex items-baseline gap-3">
-                <span className="min-w-0 shrink truncate text-neutral-100 underline-offset-4 group-hover:underline">
+              <span className="flex w-full items-baseline gap-3">
+                <span className="min-w-0 flex-1 truncate text-neutral-100 underline-offset-4 group-hover:underline">
                   {writing.title}
                 </span>
                 {isRecent(writing.date) ? (
@@ -89,7 +89,7 @@ export default async function WritingsPage() {
                     New
                   </span>
                 ) : null}
-                <span className="ml-auto shrink-0 text-sm tabular-nums text-neutral-500">
+                <span className="shrink-0 text-sm tabular-nums text-neutral-500">
                   {monthYear.format(writing.date)}
                 </span>
               </span>
