@@ -1,12 +1,14 @@
 import { defineCollection, defineConfig } from "@content-collections/core";
 import { compileMDX } from "@content-collections/mdx";
 import rehypeShiki from "@shikijs/rehype";
+import remarkGfm from "remark-gfm";
+import { z } from "zod"
 
 const englishWritings = defineCollection({
   name: "englishWritings",
   directory: "content/writings/en",
   include: "*.mdx",
-  schema: (z) => ({
+  schema:z.object({
     title: z.string(),
     summary: z.string(),
     locale: z.literal("en").default("en"),
@@ -14,6 +16,7 @@ const englishWritings = defineCollection({
   }),
   transform: async (document, context) => {
     const mdx = await compileMDX(context, document, {
+      remarkPlugins: [remarkGfm],
       rehypePlugins: [[rehypeShiki, { theme: "ayu-dark" }]],
     });
     return {
@@ -27,7 +30,7 @@ const germanWritings = defineCollection({
   name: "germanWritings",
   directory: "content/writings/de",
   include: "*.mdx",
-  schema: (z) => ({
+  schema: z.object({
     title: z.string(),
     summary: z.string(),
     locale: z.literal("de").default("de"),
@@ -35,6 +38,7 @@ const germanWritings = defineCollection({
   }),
   transform: async (document, context) => {
     const mdx = await compileMDX(context, document, {
+      remarkPlugins: [remarkGfm],
       rehypePlugins: [[rehypeShiki, { theme: "ayu-dark" }]],
     });
     return {

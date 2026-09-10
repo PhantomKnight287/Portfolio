@@ -1,10 +1,16 @@
 {
+	"Experience": {
+		"present": "Heute",
+		"title": "Erfahrung"
+	},
 	"HomePage": {
 		"currently": "Momentan arbeite ich in einem Firma und nutzen",
 		"description": "Ein {age}-jähriger autodidaktischer Entwickler aus Indien, der gerne programmiert und Dinge herstellt.",
 		"learning": "und lerne",
+		"resume": "Lebenslauf",
 		"summary": "Ich bin ein Full Stack Web und App Entwickler aus Indien.",
-		"tagline": "Ich erstelle"
+		"tagline": "Ich erstelle",
+		"viewAll": "Alle ansehen"
 	},
 	"Projects": {
 		"aero": {

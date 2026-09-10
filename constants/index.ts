@@ -149,3 +149,92 @@ export const Projects = [
   },
 
 ] as Project[];
+
+export interface Experience {
+  role: string;
+  company: string;
+  url?: string;
+  /** "2024-01" or "2024-01-15" */
+  start: string;
+  /** omit for current role */
+  end?: string;
+  /** one bullet per line, shown when the entry is expanded */
+  points: string[];
+  tags: string[];
+}
+
+export const Experiences: Experience[] = [
+  {
+    role: "Full Stack Developer",
+    company: "Ideanomic",
+    url: "https://ideanomic.com",
+    start: "2023-10",
+    points: [
+      "Own projects end to end across several client engagements at a time, from API design through the frontend to deployment.",
+      "Built a job platform on Next.js, Nest.js, Prisma and PostgreSQL with separate employer and candidate journeys, supporting full-time, milestone-based and hourly hiring.",
+      "Automated onboarding and payroll syncing through a Dayforce and Famly integration, taking a sync that ran for 13 hours down to roughly 1.",
+      "Designed an IFS Cloud ERP integration around a declarative endpoint config, so new sync endpoints are added without writing code.",
+      "Replaced a manual audit with a reconciliation tool that diffs records across two IFS versions and repairs the mismatches it finds.",
+    ],
+    tags: [
+      "Next.js",
+      "Nest.js",
+      "TypeScript",
+      "Prisma",
+      "PostgreSQL",
+      "Dayforce",
+      "IFS Cloud",
+    ],
+  },
+  {
+    role: "Full Stack Developer",
+    company: "WLBS",
+    url: "https://wlbs.dev",
+    start: "2024-04",
+    end: "2025-11",
+    points: [
+      "Worked across the agency's product portfolio, shipping most of my work on Karm, Godaam and the Vogueshots CRM, from database schema to deployment.",
+      "Karm, an HR platform on Remix, Prisma and PostgreSQL: built fortnightly payroll with TDS and payslips, attendance corrections, leave and break balances, task carry-forward cronjobs, Google auth, web push and SSE notifications.",
+      "Cut Karm's page loads by moving heavy routes to Remix defer, adding server-timing instrumentation, real skeletons and nuqs-backed URL state, and moved avatar processing to sharp with background removal through Replicate.",
+      "Godaam, a cold-storage monitoring product on the T3 turbo stack with a Next.js dashboard: added warehouse, stack and device management, bulk CSV device import, corporation-admin roles and permissions, and reworked group alerting.",
+      "Built the sensor pipeline behind it: a Hono service that polls devices on a cron, filters readings against per-device thresholds into PostgreSQL, and an AWS Lambda that serves time-bucketed aggregates from a DynamoDB table of raw readings.",
+      "Vogueshots wedding CRM: guest and template management with OCR-assisted card parsing, invitation and RSVP flows over the Interakt WhatsApp API, scheduled reminder cronjobs, S3 attachments and a planner analytics dashboard.",
+      "Put the guardrails in on Godaam: turned off the build's lint and type-error suppression, cleared the backlog of errors across every package, and added lint and typecheck GitHub Actions so they stayed at zero.",
+    ],
+    tags: [
+      "Remix",
+      "Next.js",
+      "tRPC",
+      "Prisma",
+      "PostgreSQL",
+      "Redis",
+      "Hono",
+      "AWS",
+      "Docker",
+    ],
+  },
+  {
+    role: "Full Stack Intern",
+    company: "Giga Growth Ventures",
+    url: "https://gigagrowthventures.com/",
+    start: "2023-08",
+    end: "2023-10",
+    points: [
+      "Built Growth Grid, a communication platform where startups and investors keep profiles, connect and share updates, in a Turborepo monorepo: Next.js frontend, Nest.js API, Prisma and PostgreSQL.",
+      "Shipped the flagship email-threaded comments feature: being tagged in a thread mails you the whole discussion, and replying to that mail posts your reply straight back into the thread, no login needed.",
+      "Matched inbound replies to their thread by hiding the thread metadata in the outgoing email body and parsing it back out in the Mailgun route webhook, then stripping quoted history from the reply.",
+      "Kept tag notifications from turning into spam with a per-user hourly cooldown and a six-hourly cron that batches pending threads into a single digest.",
+      "Added realtime chat and search over Socket.io gateways, and a dashboard charting startup, investor and funding activity month over month.",
+    ],
+    tags: [
+      "Next.js",
+      "Nest.js",
+      "Prisma",
+      "PostgreSQL",
+      "Socket.io",
+      "Turborepo",
+      "Mailgun",
+      "Resend",
+    ],
+  },
+];

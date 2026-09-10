@@ -43,7 +43,7 @@ export default async function Page(props: {
   if (!post) return notFound();
   return (
     <article className="min-h-screen container items-center justify-center flex-col">
-      <div className="flex flex-col max-w-[720px] mx-auto p-0">
+      <div className="flex flex-col max-w-[600px] mx-auto p-0">
         <div className="container !mx-0 prose prose-invert prose-lg my-5">
           <h1 className="text-xl font-bold mb-1">{post.title}</h1>
           <p className="text-sm text-gray-500 m-0">{dayjs(post.date).format("DD/MM/YYYY")}</p>

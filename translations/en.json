@@ -1,10 +1,16 @@
 {
+	"Experience": {
+		"present": "Present",
+		"title": "Experience"
+	},
 	"HomePage": {
 		"currently": "Currently working with",
 		"description": "A {age} year old self-taught developer living in India, who loves to code and make things.",
 		"learning": "and learning",
+		"resume": "Resume",
 		"summary": "I am a Full Stack Web and App Developer from India.",
-		"tagline": "I make"
+		"tagline": "I make",
+		"viewAll": "View all"
 	},
 	"Projects": {
 		"aero": {

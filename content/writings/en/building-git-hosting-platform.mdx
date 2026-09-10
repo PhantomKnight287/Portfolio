@@ -1,0 +1,665 @@
+---
+title: "Building a Git Hosting Platform"
+summary: "Things I learnt about git hosting platforms while trying to build one"
+date: 2026-09-09
+---
+
+I've been building [Ghost](https://github.com/phantomknight287/ghost) and this blog post is on the learnings and design decision behind it.
+
+TLDR;
+<img src="/writings/its-all-git.jpg" className="rounded-md" alt="Its all just git" />
+
+
+A git platform, behind all its HTTP controllers and other GUI, is just git invocations. But Before we move on to working of git hosting providers, we need to learn how git actually functions. Like not its internals, but its protocols.
+
+So, git can push or pull data using 2 ways:
+- SSH
+- HTTPS
+
+I will only be covering HTTPS in this article as I am yet to work on SSH based access.
+
+HTTPs itself has 2 protocols:
+- Git Smart Protocol
+- Git dumb Protocol
+
+
+The Platform that I've built only supports git smart protocol because I wasn't really able to find some good documentation on dumb protocol. However you can read the reference [here.](https://git-scm.com/book/en/v2/Git-Internals-Transfer-Protocols)
+
+
+### Some words you will keep seeing
+
+Before the routes, here are the words git throws at you. I knew some of these vaguely and had to actually look them up while building this.
+
+**Object** - anything git stores. A commit, a tree (a directory), a blob (a file's contents), or a tag. Every object is stored under the sha1 of its own contents, so the same file content in two repos has the same id.
+
+**oid** - object id. The sha of an object, the thing you see as `a3f9c1...`. 40 characters when written as hex, 20 bytes when stored raw. All zeroes is a special oid meaning "nothing here".
+
+**ref** - a name pointing at an oid. `refs/heads/main` is a branch, `refs/tags/v1` is a tag. A branch is a file with a sha in it, that's all it has ever been.
+
+**HEAD** - the ref that says which branch is the current one.
+
+**Packfile** - a bunch of objects zipped into one file, with some of them stored as deltas against others. This is what actually goes over the network. It starts with the ascii bytes `PACK`.
+
+**Thin pack** - a packfile with deltas whose base objects are missing on purpose, because the sender knows the receiver already has them. Great for bandwidth, annoying for me later.
+
+**pkt-line** - git's way of splitting a stream into messages. 4 hex characters saying how long the message is, then the message. The length counts those 4 characters too.
+
+**Flush packet** - the pkt-line `0000`. It means "that section is done".
+
+**Sideband** - a way of multiplexing progress messages and errors into the same stream as the pack data, so git can print "Counting objects" while sending you bytes.
+
+<style dangerouslySetInnerHTML={{ __html: `
+.gh-fig{border:1px solid rgba(255,255,255,.12);border-radius:.6rem;background:rgba(255,255,255,.02);padding:1.1rem 1rem .9rem;margin:2rem 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;line-height:1.35;overflow-x:auto}
+.gh-fig *{box-sizing:border-box}
+.gh-cap{margin-top:.85rem;font-size:.72rem;color:rgba(255,255,255,.45);font-family:inherit}
+.gh-node{border:1px solid rgba(255,255,255,.18);border-radius:.4rem;padding:.45rem .6rem;background:rgba(255,255,255,.04);white-space:nowrap}
+.gh-flow{display:flex;align-items:stretch;gap:1.4rem;min-width:720px}
+.gh-flow>.gh-node{align-self:center}
+.gh-wires{flex:1;display:flex;flex-direction:column;gap:1.6rem;padding:.4rem 0}
+.gh-wire{display:block}
+.gh-wire .gh-lbl{display:block;color:rgba(255,255,255,.62);white-space:nowrap;margin-bottom:.4rem}
+.gh-wire .gh-sub{display:block;color:rgba(255,255,255,.32);white-space:nowrap;margin-top:.45rem}
+.gh-line{position:relative;height:1px;background:rgba(255,255,255,.16)}
+.gh-dot{position:absolute;top:-3px;width:7px;height:7px;border-radius:50%;background:#7dd3fc;box-shadow:0 0 8px #7dd3fc;animation:gh-ltr 2.6s linear infinite}
+.gh-dot.back{background:#fbbf24;box-shadow:0 0 8px #fbbf24;animation-name:gh-rtl}
+@keyframes gh-ltr{from{left:0;opacity:0}10%{opacity:1}90%{opacity:1}to{left:100%;opacity:0}}
+@keyframes gh-rtl{from{left:100%;opacity:0}10%{opacity:1}90%{opacity:1}to{left:0;opacity:0}}
+.gh-pkt{display:flex;min-width:560px;align-items:stretch;gap:.35rem;padding:.3rem 0}
+.gh-seg{border:1px solid rgba(255,255,255,.18);border-radius:.3rem;padding:.6rem .8rem;text-align:center}
+.gh-seg small{display:block;margin-top:.3rem;font-size:.66rem;color:rgba(255,255,255,.4)}
+.gh-seg.len{background:rgba(125,211,252,.12);border-color:rgba(125,211,252,.45);color:#7dd3fc}
+.gh-seg.flush{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.4);color:#fbbf24}
+.gh-steps{display:flex;flex-direction:column;gap:.4rem;min-width:520px}
+.gh-step{display:flex;gap:.7rem;align-items:center;padding:.45rem .6rem;border:1px solid rgba(255,255,255,.1);border-radius:.35rem;animation:gh-sweep 6s ease-in-out infinite}
+.gh-step .n{color:rgba(255,255,255,.35);width:1.1rem}
+.gh-step.commit{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.07);color:#6ee7b7}
+@keyframes gh-sweep{0%,100%{background:rgba(255,255,255,.01)}8%,16%{background:rgba(255,255,255,.07)}}
+.gh-cols{display:flex;gap:1.6rem;min-width:640px;position:relative;align-items:flex-start}
+.gh-col{flex:1;border:1px solid rgba(255,255,255,.14);border-radius:.45rem;padding:.6rem}
+.gh-col h4{margin:0 0 .5rem;font-size:.72rem;color:rgba(255,255,255,.55);font-weight:400;font-family:inherit}
+.gh-layer{padding:.25rem .45rem;border:1px solid rgba(255,255,255,.12);border-radius:.3rem;margin-bottom:.3rem;background:rgba(255,255,255,.03)}
+.gh-layer.new{border-color:rgba(125,211,252,.45);color:#7dd3fc}
+.gh-borrow{align-self:center;text-align:center;color:rgba(255,255,255,.45);padding:0 .4rem;white-space:nowrap}
+.gh-borrow .arrow{display:block;height:1px;width:5rem;margin:.35rem auto;background:repeating-linear-gradient(90deg,rgba(125,211,252,.8) 0 6px,transparent 6px 12px);animation:gh-march .8s linear infinite}
+@keyframes gh-march{to{background-position:12px 0}}
+.gh-bar{display:flex;gap:.35rem;min-width:520px;margin-bottom:.5rem}
+.gh-cell{flex:1;text-align:center;padding:.45rem 0;border:1px solid rgba(255,255,255,.14);border-radius:.3rem;background:rgba(255,255,255,.03)}
+.gh-cell.missing{border-style:dashed;color:rgba(255,255,255,.3)}
+.gh-cell.filling{animation:gh-fill 3.2s ease-in-out infinite}
+.gh-cell.d1{animation-delay:.5s}.gh-cell.d2{animation-delay:1s}.gh-cell.d3{animation-delay:1.5s}
+@keyframes gh-fill{0%,20%{border-style:dashed;color:rgba(255,255,255,.3);background:rgba(255,255,255,.02)}45%,100%{border-style:solid;color:#7dd3fc;border-color:rgba(125,211,252,.45);background:rgba(125,211,252,.08)}}
+@media (prefers-reduced-motion:reduce){.gh-fig *{animation:none !important}}
+` }} />
+
+### Working of Smart protocol
+
+Smart protocol depends on 3 HTTP routes.
+- `/info/refs?service=`
+- `/git-upload-pack`
+- `/git-receive-pack`
+
+
+
+### `/info/refs?service=`
+Git sends a get request to this route to check if refs in local store of git is same as what is on the server. If they are same, git shows `Already upto date` message. 
+
+The service is the fun part in this. It could be either
+- `git-upload-pack`, the client wants to take stuff from you (clone, fetch, pull)
+- `git-receive-pack`, the client wants to give you stuff (push)
+
+Only those two. If you get anything else in that query param, someone is poking at your server, so throw an error there.
+
+The response is not JSON. Git talks in pkt-lines, which I explained above, so the body looks like this:
+
+```
+001e# service=git-upload-pack\n
+0000
+<whatever git prints>
+```
+
+`001e` is hex for 30, and the line is 30 bytes counting those 4 characters. Then a flush packet to close that bit off.
+
+
+  <div className="gh-pkt text-sm">
+    <div className="gh-seg len">001e<small>length, hex, counts itself</small></div>
+    <div className="gh-seg" style={{ flex: 1 }}># service=git-upload-pack\n<small>26 bytes of payload</small></div>
+    <div className="gh-seg flush">0000<small>flush, section over</small></div>
+  </div>
+  <div className="gh-cap">0x1e is 30. 4 + 26 = 30. That is the whole framing format.</div>
+
+The `<whatever git prints>` part is the ref advertisement, which is the list of every ref you have and the oid it points at. I did not write that list. Git writes it:
+
+```ts
+output.write(packetLine(`# service=${service}\n`));
+output.write(FLUSH_PACKET);
+
+const child = spawn('git', [binary, '--stateless-rpc', '--advertise-refs', repoDirectory]); 
+//                          ^binary here could either be upload-pack or receive-pack
+child.stdout.pipe(output);
+```
+
+`--advertise-refs` makes git print the list and quit instead of waiting around for the client to say something back.
+
+One thing to watch: the content type has to be `application/x-git-upload-pack-advertisement`. If it's wrong, git assumes you are a dumb server and starts requesting files off you that you don't have, and the error you get back tells you nothing useful.
+
+### `/git-upload-pack`
+
+This is a clone or a fetch. The client sends a body full of `want <oid>` lines for stuff it wants and `have <oid>` lines for stuff it already has, git works out the difference and sends back a packfile.
+
+I implemented none of that. Spawn `git upload-pack --stateless-rpc <repo>`, pipe the request body into stdin, pipe stdout back into the response:
+
+```ts
+this.packProcess.streamUploadPack({ repoDirectory, input: body.open() });
+```
+
+`--stateless-rpc` is important here. Normally `upload-pack` expects a live socket where it can go back and forth with the client a few times. Over HTTP each request is one shot, so that flag makes git do a single round and exit.
+
+### `/git-receive-pack`
+
+This is a push, and it's the only route where I actually read the body instead of forwarding it, because this is where I find out what the client wants to change.
+
+The body:
+
+```
+<pkt-line> "<old-oid> <new-oid> <ref>\0<capabilities>"
+<pkt-line> "<old-oid> <new-oid> <ref>"
+0000
+PACK....
+```
+
+Those first lines are the command section. One line per ref being updated, saying "I think `refs/heads/main` is at `old-oid` right now and I want it at `new-oid`". Then a flush packet, then the packfile.
+
+Two things here I want to point out because both of them made my life easier later.
+
+First, that `old-oid` is a compare and swap, and git did the heavy-lifting for me. If my stored ref doesn't match it, the push is a non fast forward and I reject it. I did not have to invent any of that, it comes with the protocol.
+
+Second, if `new-oid` is all zeroes, the client is deleting the branch. Same route, same format, you just drop the ref.
+
+After reading the commands and storing what I need, the whole body goes into `git receive-pack --stateless-rpc` and git writes the objects to disk. So no, I did not write a packfile parser. Please don't write a packfile parser.
+
+## So what is a git host then
+
+3 HTTP routes, 4 hex digits of framing, and `spawn('git')`. That is the transport, all of it. The UI, pull requests, stars, that little language colour bar, all of it is a normal web app sitting next to a folder of bare repos.
+
+Which is fine until you remember that "a folder of bare repos" only works if you have one server and it never dies. That's where the rest of the work went.
+
+## Write the useless version first
+
+Before any of the storage stuff, here is a git host. It's about 40 lines, it has no database, no auth and no S3, and you can clone from it and push to it right now.
+
+```js
+import express from "express";
+import { spawn } from "node:child_process";
+import path from "node:path";
+import fs from "node:fs";
+
+const app = express();
+const ROOT = "/tmp/ghost";
+
+function repoDir(req) {
+  const { user, repo } = req.params;
+  const dir = path.join(ROOT, user, repo.replace(/\.git$/, "") + ".git");
+  if (!fs.existsSync(dir)) spawn("git", ["init", "--bare", dir]);
+  return dir;
+}
+
+const pkt = (line) =>
+  (Buffer.byteLength(line) + 4).toString(16).padStart(4, "0") + line;
+
+app.get("/:user/:repo/info/refs", (req, res) => {
+  const service = req.query.service;
+  if (service !== "git-upload-pack" && service !== "git-receive-pack") {
+    return res.sendStatus(403);
+  }
+
+  res.setHeader("Content-Type", `application/x-${service}-advertisement`);
+  res.setHeader("Cache-Control", "no-cache");
+  res.write(pkt(`# service=${service}\n`));
+  res.write("0000");
+
+  const git = spawn("git", [
+    service.replace("git-", ""),
+    "--stateless-rpc",
+    "--advertise-refs",
+    repoDir(req),
+  ]);
+  git.stdout.pipe(res);
+});
+
+for (const service of ["git-upload-pack", "git-receive-pack"]) {
+  app.post(`/:user/:repo/${service}`, (req, res) => {
+    res.setHeader("Content-Type", `application/x-${service}-result`);
+    res.setHeader("Cache-Control", "no-cache");
+
+    const git = spawn("git", [
+      service.replace("git-", ""),
+      "--stateless-rpc",
+      repoDir(req),
+    ]);
+    req.pipe(git.stdin);
+    git.stdout.pipe(res);
+  });
+}
+
+app.listen(3001);
+```
+
+Then:
+
+```sh
+git clone http://localhost:3001/me/test.git
+cd test && echo hi > readme.md && git add . && git commit -m "hi"
+git push origin main
+```
+
+So if it's that easy, what is the rest of this post about? Everything this version quietly gets wrong:
+
+- Anyone can push to anyone's repo. There is no auth at all.
+- The repos only exist on this one machine's `/tmp`. Restart the box and they might be gone.
+- Two people pushing at once is decided by whichever git process gets to the ref file first.
+- There is no way to see any of it in a browser.
+- Push something over 1 MiB and it breaks, for a reason that took me an embarrassingly long time to find.
+
+Every section after this is me fixing one of those.
+
+## Auth, and why git has to be challenged first
+
+Git has no concept of cookies. It speaks HTTP Basic, and only the server responds with 401 initially.
+
+So the flow is: git asks for something, my server answers `401` with a `WWW-Authenticate: Basic realm="Ghost"` header, and only then does git either look up the credential helper or prompt for a username and password. If I return a 401 without that header, git just fails and the user never gets asked for anything, which looks like my server being broken.
+
+The password is not the account password. It's a personal access token, made in account settings, exactly like GitHub does it. The username is ignored entirely. I used better-auth's [API keys](https://better-auth.com/docs/plugins/api-key) for it but you can use anything   
+
+```ts
+const header = req.headers.authorization;
+if (!header?.startsWith('Basic ')) return null;
+
+// username is ignored, the password is the key, and a key can contain ":"
+const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+const key = decoded.slice(decoded.indexOf(':') + 1);
+
+const { valid, key: apiKey } = await this.auth.api.verifyApiKey({ body: { key } });
+return valid && apiKey ? { userId: apiKey.referenceId } : null;
+```
+
+2 more things
+
+**Read and write are decided before anything runs.** A clone of a public repo needs no auth. A push always does. Git asks for the receive-pack advertisement *before* it uploads anything, so the check is:
+
+```ts
+const isPush =
+  req.path.endsWith('/git-receive-pack') ||
+  req.query.service === 'git-receive-pack';
+```
+We turn a user away at `info/refs` instead of during the actual push after they've spent their precious CPU cycles and ram compressing stuff(its expensive these days yk).
+
+And this all runs in middleware, before the body is spooled anywhere, so a rejected push never touches my disk at all(disks are also expensive these days).
+
+## Now the actual build
+
+Ghost is a Turborepo. Next.js on the front, NestJS for the API, Postgres with Drizzle, and an S3 bucket. Bun everywhere. All the decisions are written down in `docs/` in the repo. Below are some of the crucial decisions that I made:
+
+### Git gets the root, REST goes under `/api`
+
+`/:username/:repo/info/refs` matches almost every URL you can think of. I had it registered next to `/repositories` and for a while it worked, until I noticed which one wins is decided by module import order in `AppModule`. Nobody is catching that in a review, and it breaks the day someone reorders imports for no reason(I am looking at you Biome).
+
+So now it's `app.setGlobalPrefix('/api')` with the git routes excluded from the prefix. Everything REST sits under `/api` and the root is git's. Same split GitHub does with `api.github.com` and `github.com/user/repo.git`.
+
+The other option was serving git under `/git/:username/:repo`, which works and which I did not want, because then every clone URL I ever hand out has a `/git` in it. People copy paste those into READMEs. I want mine to read `host/user/repo.git`.
+
+
+### Keeping HTTP out of `GitService`
+
+`GitService` takes streams and gives back `{ headers, body }`. The controller is the only file that knows HTTP is involved.
+
+There were a few reasons:
+1. I want to reuse `GitService` when I implement ssh.
+2. Separation of concern, just to keep the code sensible and reduce mental load.
+
+### S3 is the truth, disk is a cache
+
+This is the decision the rest of the thing hangs off, and honestly part of it was my hardware.
+
+I develop this on a Mac mini with a 256GB SSD. I cannot keep a bunch of test repos on it, and I definitely cannot clone something like a 7GB repo to see what my server does with it. If disk is where the data lives, then the size of my laptop is the size of my product, which is a stupid place to be.
+
+The other half is the normal reason. A bare repo on local disk does not survive a crash, does not survive the machine getting replaced, and does not work at all once there is more than one server. A box that has never seen a repo still has to be able to serve it.
+
+So the real state of a repo is a write ahead log in S3:
+
+```
+repos/<repoId>/index                  the only mutable object
+repos/<repoId>/entries/<ulid>.pack    immutable, header + packfile bytes
+```
+
+And the bare repos on disk are just a cache. They live in `os.tmpdir()`, so `/tmp/ghost/<repoId>.git` on my machine, keyed by the repo's row id and not by `username/repo`, so renaming either one doesn't orphan anything. `/tmp` is on purpose. If the OS clears it, or I `rm -rf` it because I'm out of space again, nothing is lost. It gets rebuilt from the log on the next request.
+
+### A push becomes real at exactly one line
+
+
+<div className="gh-fig">
+  <div className="gh-steps">
+    <div className="gh-step" style={{ animationDelay: '0s' }}><span className="n">1</span> parse command section, get the ref transitions</div>
+    <div className="gh-step" style={{ animationDelay: '.5s' }}><span className="n">2</span> PUT entries/&lt;ulid&gt;.pack, unguarded, can be repeated</div>
+    <div className="gh-step" style={{ animationDelay: '1s' }}><span className="n">3</span> GET index, keep the etag</div>
+    <div className="gh-step" style={{ animationDelay: '1.5s' }}><span className="n">4</span> every oldOid must match the ref in that index</div>
+    <div className="gh-step commit" style={{ animationDelay: '2s' }}><span className="n">5</span> PUT index with If-Match, this is the push</div>
+    <div className="gh-step" style={{ animationDelay: '2.5s' }}><span className="n">6</span> let git write to the cache, answer the client</div>
+  </div>
+  <div className="gh-cap">Die on 1 to 4 and nothing happened. Die on 6 and the push is already real. Only line 5 decides.</div>
+</div>
+
+
+The reason I can do that is that a push is carrying two things that have nothing in common.
+
+The objects are named after their own hash. Push the same blob twice and the second one lands on top of an identical file, so it does not matter if I upload it twice, and it does not matter if I upload it and then the push dies. Worst case some bytes sit in the bucket that nobody points at. Nobody can see them, no clone will ever ask for them, they just cost me storage.
+
+The refs are the opposite. `refs/heads/main` is one value that everyone reads, so if two people move it at the same time one of them has to lose.
+
+So I upload the big slow thing with nothing protecting it at all, and then the tiny 200 byte index write is the only place I need to be careful. Steps 1 to 4 can be repeated, interrupted, or thrown away and the repo does not notice. If the process dies at step 5, the repo is exactly what it was before the push started.
+
+Free bonus, a push touching 5 branches is a single index write, so it's all or nothing. Local git needs `--atomic` to give you that.
+
+S3 caveats that I learnt quite late:
+
+- Do not treat 409 status code from S3 as a failure. `ConditionalRequestConflict` just means that two conditional writes raced and the one that threw that error failed, so try again. 
+- `IfNoneMatch: '*'` on the first ever push. Otherwise two pushes into a brand new repo can both see "no index here" and both happily write one.
+
+
+### What happens when 2 people push at once
+
+Nothing clever. They race and one of them loses.
+
+Both read `seq = 5`, both build an index that says 6, both send it with `If-Match` on the etag they read. S3 takes the first one and rejects the second. The loser reads the index again, sees 6 is taken, and goes again as 7. `seq` can never be handed out twice because asking for it and publishing it are the same request.
+
+Where I messed up was doing the validation once before that loop. That felt fine until I thought about who actually lost the race:
+
+If the winner pushed `develop` and I'm pushing `main`, my push is still completely valid. `main` is where I left it. I just need a different seq, so I retry and land on 7.
+
+If the winner pushed `main` too, then the `main` I checked against is gone. My `oldOid` doesn't match anymore. That's a real non fast forward and retrying it 8 times just wastes everyone's time.
+
+So the check has to run again on every attempt, against the index I just re-read. If it only runs once, two people pushing to the same branch within the same second both get a 200 and one of their commits quietly disappears. That is not a bug you find by clicking around.
+
+Then there's the annoying case. A PUT times out and I have no idea whether it landed. If I retry, `oldOid` won't match anymore and I'd tell someone their push was rejected when it actually went through, which is a great way to lose trust in a git host. So the entry's ULID doubles as an idempotency key. Before I report anything, I check whether the index already lists my ULID, and if it does, that was me, the push is in.
+
+### Why the log is binary and not JSON
+
+I hand rolled a binary format. Big endian, magic prefix, version byte. I'm aware of how that sounds.
+
+The index is read on every push and every time a cache catches up, so it's the hottest thing in the system. Most of its size is object ids, and in JSON those have to be hex, so 40 bytes for something that fits in 20, plus quotes and key names around each one. Storing raw halves that and there's no parse step.
+
+Entry header:
+
+```
+magic               u32   "GENT"
+version             u8
+headerLen           u32   the packfile starts at exactly this offset
+ulid                16 raw bytes
+createdAt           u64
+pushedBy            u16 length + utf8
+transitionCount     u32
+  refName           u16 length + utf8
+  oldOid            20 raw bytes
+  newOid            20 raw bytes
+<packfile bytes>
+```
+
+`headerLen` at the front is the part I like. It means I can read who pushed an entry and what it changed with `Range: bytes=0-65535` instead of downloading a 500MB packfile to find out.
+
+There's also a `flags` byte sitting there doing nothing. It's for sha256. Git is slowly moving off sha1 and if that ever reaches me, oids stop being 20 bytes and every reader has to know which size it's looking at. With the byte there it's one bit and a branch in the decoder. Without it I'd be guessing hash length from field offsets, or rewriting every entry in every repo. It costs 1 byte per object so I just put it in and left it at zero.
+
+Same reasoning for `version`. Decode checks it and throws `WalCorruptError` on anything it doesn't know.
+
+### Index holds a snapshot, entries hold the diff
+
+I store both, which looked redundant until I tried dropping either one.
+
+The snapshot answers "where is `main` right now" in a single GET with no history to walk. That's every ref advertisement and every cache catch up, so it has to be cheap.
+
+The transitions answer "where was `main` at push 37". That's reflog, audit, and restoring to a point in time, none of which a snapshot can give you.
+
+Keep only the transitions and every read costs you the whole history. Keep only the snapshot and you have deleted the reason you built a log instead of a folder.
+
+### Catching the cache up
+
+Before every read and every push, the cached bare repo gets brought up to whatever the log says. It remembers where it is in a `ghost-wal-seq` file inside the repo directory.
+
+```
+read index -> compare to cached seq -> index-pack each missing layer in order
+           -> reconcile refs to the snapshot -> repoint HEAD -> write cached seq
+```
+
+
+<div className="gh-fig">
+  <div className="gh-bar">
+    <div className="gh-cell">L1</div>
+    <div className="gh-cell">L2</div>
+    <div className="gh-cell missing filling">L3</div>
+    <div className="gh-cell missing filling d1">L4</div>
+    <div className="gh-cell missing filling d2">L5</div>
+  </div>
+  <div className="gh-cap">Cache says seq 2, index says seq 5. index-pack L3, L4, L5 in that order, reconcile refs to the snapshot, write 5 into ghost-wal-seq. Never backwards, never in parallel.</div>
+</div>
+
+The cache can be behind the log and can never be ahead of it, which is exactly what committing before touching disk bought me. So this only ever moves forward and I never had to write an undo path, which is good, because undo paths are where I would have put the bug.
+
+3 things I found out the slow way here.
+
+Pushed packs are thin. The client leaves out base objects it knows the server already has, and replaying that into an empty object store just fails. `git index-pack --fix-thin --stdin` fills in the gaps from what's already in the repo, and layers have to go in strictly one after another, never in parallel, because layer *n*'s bases are sitting in the layers before it.
+
+Refs get reconciled, not replayed. I take the index snapshot and apply it in one `git update-ref --stdin` batch, then delete any ref on disk that the snapshot doesn't have. Replaying transitions one at a time gets you to the same place for more money, and it breaks if the cache drifted even slightly. Applying a snapshot works from any starting state, so a stale cache, or one I poked at by hand, fixes itself.
+
+HEAD is a trap. If a bare repo's `HEAD` points at a branch that doesn't exist, cloning it gives you an empty repo and no error whatsoever. That one cost me an evening. So after reconciling I point HEAD at `main`, then `master`, then whatever branch is actually there.
+
+## Showing the repo in a browser
+
+The transport is done at this point but nobody can see anything. This part surprised me by being the easy half, because git ships plumbing commands that are meant to be read by programs and not humans.
+
+Resolve whatever the URL says into a sha:
+
+```
+git rev-parse --verify <ref>^{commit}
+```
+
+List one directory, not the whole tree:
+
+```
+git ls-tree -z -l <ref>:<path>
+```
+
+`-z` gives you NUL separated records so filenames with spaces or newlines don't ruin your day, and `-l` adds the blob size. You get mode, type, oid, size and name per entry, and a mode of `040000` is a directory. That's the whole file browser.
+
+Read a file:
+
+```
+git cat-file --batch-check      <- stdin: "<ref>:<path>"
+git cat-file blob <oid>
+```
+
+I do the `--batch-check` first because it tells me the type and size without sending me the contents, so I can refuse to syntax highlight a 40MB binary before reading it. Also note the revision goes in over stdin, not argv, because a path starting with `-` in argv is an option waiting to happen.
+
+Commits are `git log`, diffs are `git diff --numstat` plus `--name-status` for the stat bar, and file contents for the diff view are just `git diff` between 2 shas.
+
+### The one place this got slow
+
+A directory listing on GitHub shows the last commit that touched each row. The obvious way to do that is one `git log -1 -- <path>` per entry, so a folder with 30 files costs 30 `git log` invocations, each of which walks history. On a repo with any real history that is unusably slow, and it's per page view.
+
+So there's a table:
+
+```
+repository_path_commit(repositoryId, ref, path, commitSha, committedAt, subject)
+```
+
+Every path gets a row, and so does every ancestor directory of a changed file, so `src` carries the newest commit under `src/`. A directory listing is then one indexed query joined against `ls-tree`, instead of 30 subprocesses. The empty string path is the repo root, so its row is the tip commit of that ref.
+
+Second table tracks how far I've walked:
+
+```
+repository_ref_index(repositoryId, ref, indexedCommitSha)
+```
+
+If the stored sha is still an ancestor of the current tip, I only need to walk the new commits. If it isn't, someone force pushed or objects went missing, so I throw the rows away and rebuild. That check is one `git merge-base --is-ancestor` away.
+
+Rows for deleted files stick around, which sounds like a bug and isn't, because the read path joins against `ls-tree`. If a file isn't in the tree anymore it never shows up, no matter what the table says.
+
+### The rest of the data model
+
+Nothing exotic, it's just Postgres:
+
+- `user`, `session`, `organization`, `apiKey` all come from better-auth. I did not write auth from scratch and neither should you.
+- `repository` with `ownerId`, a nullable `organizationId` so a repo can belong to a person or an org, `visibility`, and `parentRepositoryId` pointing at whatever it was forked from.
+- Unique index on `(ownerId, slug)` where the org id is null, and on `(organizationId, slug)` where it isn't.
+- `pullRequest` storing base and head as separate repository ids, because a fork PR spans 2 repos and a normal one doesn't.
+
+The repo id is what everything else keys off, including the S3 log and the cache directory. Not `username/repo`. The first version used the path and then I renamed a repo in dev and watched it forget its entire history, which was a fun 10 seconds.
+
+## 3 bugs that were worth the whole thing
+
+### 1. Never leave a stream sitting there across an `await`
+
+The push path used to do this:
+
+```ts
+const repoDirectory = await this.openCache({ username, repo }); // S3 + subprocesses
+const body = await readStream(input);                            // too late
+```
+
+If nobody is reading a request stream, whatever arrives while you're busy is gone. Git writes its command section in its own socket write, so the chunk I dropped during that await was the ref updates. The body then started at the flush packet after them, and my parser said "no ref update commands", which is a completely accurate error message pointing nowhere near the actual problem.
+
+It only shows up when the await is slow enough, so it appeared against real S3 and never once in tests.
+
+Swapping those two lines fixes today's symptom and not the actual shape of the bug. The moment I add an async guard (and Basic auth for git is going to be one), the stream is sitting unread again during the guard, before my handler even runs. So the body gets drained in middleware now, which in Nest runs before guards. Nothing async can get between the socket and the first read.
+
+A stream is not a value sitting there waiting for you. It's already running.
+
+### 2. The empty POST is a probe, not a broken push
+
+This one only shows up above 1 MiB, which is a lovely quality in a bug.
+
+A push bigger than `http.postBuffer` (1 MiB by default) can't be buffered, so git sends it chunked. A chunked request can't be rewound, so if git gets a 401 it can't replay the body with credentials attached. Its answer is `probe_rpc()` in `remote-curl.c`, which fires a throwaway POST first with a body of exactly `0000` and `Content-Length: 4`, checks the status, handles auth there, and only then streams the real push.
+
+From an actual push:
+
+```
+POST #1  bytes=4        content-length=4            head="0000"
+POST #2  bytes=2428943  transfer-encoding=chunked   head="00b600000000"
+```
+
+I was answering that probe with a 400, because a body with no ref update commands in it is obviously broken. So:
+
+```
+error: RPC failed; HTTP 400 curl 22 The requested URL returned error: 400
+send-pack: unexpected disconnect while reading sideband packet
+fatal: the remote end hung up unexpectedly
+```
+
+My tests pushed a 95 KB repo and a 178 KB repo. Both under `postBuffer`, so both used `Content-Length` and neither ever probed. Everything passed. Every real repo failed every time.
+
+The fix is 4 lines. If the whole body is one flush packet, return 200 with an empty body and don't touch anything.
+
+### 3. `Hash.update` gives up at 2 GiB
+
+Pushed the Next.js repo. 2.25 GiB packfile.
+
+```
+RangeError: data is too long
+    at Hash.update (node:internal/crypto/hash:144:22)
+    at PushTransactionService.commitPush (push-transaction.service.ts:46)
+  code: 'ERR_OUT_OF_RANGE'
+```
+
+Node's native hash throws when you give it more than `INT_MAX`, so 2,147,483,647 bytes. My pack was 2,415,919,104.
+
+`createHash('sha256').update(pack)` was never going to work on a real repo.
+
+Fixing the hash alone would have moved the crash down one line, since every one of these was the same problem:
+
+
+| Was | Now |
+| --- | --- | 
+| `readStream(req)` into a Buffer | spooled to a temp file |
+| `createHash().update(pack)` | `pipeline(body.open(offset), hash)` |
+| `Buffer.concat([header, pack])` | an async generator |
+| `putObject({ Body: buffer })` | stream + explicit `ContentLength` |
+| `readEntryPack()` -> Buffer | `openEntryPack()` -> ranged GET stream |
+
+The body is a `GitRequestBody` now, which is `{ size, open(start?) }`. Not a plain `Readable`, because the push path needs the body twice, once for the command section and once to feed `receive-pack`, and the log needs the packfile on its own starting at `packOffset`. A single pass stream can't do that, and I also can't hold the bytes anywhere. `open(start)` gives me as many passes as I want at any offset, and it knows nothing about HTTP, so tests pass `bufferBody(...)`, production passes `fileBody(...)`, and nothing below the controller can tell.
+
+The test that guards this streams 2.15 GiB through `commitPush` in about a second.
+
+## Pull requests, or 2 logs that can't see each other
+
+Every repo has its own log keyed by its row id. Forking copies the parent's layers into the fork's keyspace and writes an index naming them, and after that moment the two logs never exchange another byte. Separate keyspaces, separate sequence numbers, neither one can read the other.
+
+So a PR from a fork is a diff between 2 commits living in 2 different object stores. Alice's log has no `B4`, Bob's log has no `A1`, and `git merge-base B4 A1` fails on either side on its own. Even `cat-file -t` on the other side's tip just errors.
+
+
+<div className="gh-fig">
+  <div className="gh-cols">
+    <div className="gh-col">
+      <h4>repos/repo_bob (base)</h4>
+      <div className="gh-layer">L1</div>
+      <div className="gh-layer">L2</div>
+      <div className="gh-layer">L3</div>
+      <div className="gh-layer new">L4' &nbsp; main = B4</div>
+    </div>
+    <div className="gh-borrow">
+      objects
+      <span className="arrow" />
+      borrowed
+    </div>
+    <div className="gh-col">
+      <h4>repos/repo_alice (fork)</h4>
+      <div className="gh-layer">L1</div>
+      <div className="gh-layer">L2</div>
+      <div className="gh-layer">L3</div>
+      <div className="gh-layer new">L4 &nbsp; feature = A1</div>
+    </div>
+  </div>
+  <div className="gh-cap">Same first 3 layers because the fork copied them. After that the logs never speak again, so Bob has no A1 and Alice has no B4. The dashed line is GIT_ALTERNATE_OBJECT_DIRECTORIES and it exists for one spawn.</div>
+</div>
+
+What saved me is **alternates**, which is a git feature I had never touched before this.
+
+Normally a repo reads objects from its own `objects` directory and nowhere else. Alternates let you tell git "also look in this other directory if you can't find something here". It's the same mechanism `git clone --shared` uses so a local clone doesn't duplicate the object store. You can set it permanently in `objects/info/alternates` inside the repo, or per command with an env var, which is what I do:
+
+```
+GIT_DIR=/tmp/ghost/repo_bob.git
+GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/ghost/repo_alice.git/objects
+
+git merge-base B4 A1        -> B3
+git diff --numstat B3 A1
+git log B3..A1
+git merge-tree --write-tree B4 A1
+```
+
+Now git is running inside Bob's repo, but when it goes looking for `A1` and can't find it, it checks Alice's object directory and finds it there. So `merge-base` works, the diff works, `log` works, and the merge works, without either repo learning anything about the other.
+
+The env var is the important half. Writing it into `objects/info/alternates` would make Bob's repo permanently depend on a directory that belongs to a fork he does not control, and if I ever delete that fork, Bob's repo is now missing objects. The env var lives for exactly one `spawn`, so a PR read borrows the objects for a few milliseconds and then the link is gone.
+
+Nothing gets copied, nothing gets written to either repo, and there is nothing to clean up after. A pull request in Ghost is a database row naming 2 `(repository, ref)` pairs and holds no git state at all. No `refs/pull/*`, no snapshot branch, no copied objects. It can't drift from the repos it describes because there is nothing there to drift.
+
+The obvious alternative is fetching from the other cache directory first, and it's worse in 3 ways. Fetching a raw sha needs `uploadpack.allowAnySHA1InWant` set on the source. Fetching a ref instead dumps it in `FETCH_HEAD`, which is one file per repo, so 2 people opening PRs at the same time stomp on each other. And either way you're copying objects that already exist one directory away.
+
+A scratch ref like `refs/ghost/pr/*` is worse still, because materialization deletes every ref the snapshot doesn't carry. So it survives right up until the next push to that repo. Works great locally, dies under traffic.
+
+The one thing here you cannot get wrong is packing the merge commit. When both tips are in the same log, excluding both is correct. Do the same across a fork, excluding `A1` because hey, I can see it right there, and you write an entry containing only the merge commit. Bob's log is then broken forever, because any server replaying it gets a merge commit whose second parent isn't there, and `--fix-thin` can't help since there's nothing local to complete the pack against.
+
+So the exclusion list is what the target log already has. Not what my process happens to be able to see at that moment.
+
+Also `git merge-tree --write-tree` exits 1 both for a conflict and for a commit it can't read. You tell them apart by stderr, a conflict leaves it empty and an unreadable commit writes `not something we can merge`. Treat every exit 1 as a conflict and a fork whose objects were never lent reports conflicts instead of failing, and that bug looks like a product decision instead of a bug.
+
+## What isn't built
+
+This is an engineering reproduction, so don't put real data in it. The holes:
+
+**SSH.** Everything above is HTTP. SSH is a different transport for the same 3 verbs and I haven't done it.
+
+**Garbage collection.** Entries uploaded by a push that then lost the CAS are orphans that nobody references, so storage grows with failed pushes. The sweep is easy to get wrong though. "Delete entries no index references" will happily delete a push that is mid upload right now. It has to be unreferenced **and** older than a few hours. The ULID has a timestamp in it so the age is free.
+
+**Compaction.** Reading the whole log on every push is O(history). `compactedThroughSeq` is in the format for a checkpoint scheme and is currently always 0.
+
+**Push failures over the sideband.** `NonFastForwardError` renders as JSON right now, and git clients do not enjoy that. Needs a pkt-line status encoder.
+
+**Webhooks, issues, CI.** Nope.
+
+Code is at [github.com/phantomknight287/ghost](https://github.com/phantomknight287/ghost). It works. Still don't put anything you care about in it.

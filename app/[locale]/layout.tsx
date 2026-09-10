@@ -1,12 +1,12 @@
 import type { PropsWithChildren } from "react";
 import "./globals.css";
 import { NextIntlClientProvider } from "next-intl";
-import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { SITE_URL } from "@/lib/og";
 
-const font = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-sans" });
+const font = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-sans" });
 
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 

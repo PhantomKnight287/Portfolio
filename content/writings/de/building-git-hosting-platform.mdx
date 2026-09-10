@@ -1,0 +1,666 @@
+---
+title: "Eine Git-Hosting-Plattform bauen"
+summary: "Was ich über Git-Hosting-Plattformen gelernt habe, während ich versucht habe, eine zu bauen"
+date: 2026-09-09
+---
+
+> **Hinweis:** Dieser Text wurde von einem LLM aus dem Englischen übersetzt. Maßgeblich ist die englische Originalfassung – bei Ungereimtheiten in Formulierung oder Fachbegriffen bitte dort nachsehen.
+
+Ich baue seit einiger Zeit an [Ghost](https://github.com/phantomknight287/ghost), und dieser Blogpost handelt von den Erkenntnissen und Designentscheidungen dahinter.
+
+Kurzfassung:
+<img src="/writings/its-all-git.jpg" className="rounded-md" alt="Es ist alles nur git" />
+
+
+Eine Git-Plattform ist hinter all ihren HTTP-Controllern und der übrigen GUI nichts weiter als Git-Aufrufe. Aber bevor wir zur Funktionsweise von Git-Hosting-Anbietern kommen, müssen wir verstehen, wie Git eigentlich arbeitet. Nicht die Interna, sondern die Protokolle.
+
+Git kann Daten auf 2 Wegen pushen oder pullen:
+- SSH
+- HTTPS
+
+In diesem Artikel behandle ich nur HTTPS, da ich den SSH-basierten Zugang noch nicht umgesetzt habe.
+
+HTTPS selbst hat 2 Protokolle:
+- Git Smart Protocol
+- Git Dumb Protocol
+
+
+Die Plattform, die ich gebaut habe, unterstützt nur das Smart Protocol, weil ich keine gute Dokumentation zum Dumb Protocol finden konnte. Die Referenz dazu kannst du aber [hier](https://git-scm.com/book/en/v2/Git-Internals-Transfer-Protocols) nachlesen.
+
+
+### Ein paar Begriffe, die dir ständig begegnen
+
+Vor den Routen hier die Begriffe, die Git dir um die Ohren wirft. Einige kannte ich vage und musste sie beim Bauen tatsächlich nachschlagen.
+
+**Object** – alles, was Git speichert. Ein Commit, ein Tree (ein Verzeichnis), ein Blob (der Inhalt einer Datei) oder ein Tag. Jedes Objekt wird unter dem SHA-1 seines eigenen Inhalts gespeichert, derselbe Dateiinhalt in zwei Repos hat also dieselbe ID.
+
+**oid** – Object ID. Der SHA eines Objekts, das Ding, das du als `a3f9c1...` siehst. 40 Zeichen als Hex geschrieben, 20 Bytes roh gespeichert. Nur Nullen ist eine spezielle oid und bedeutet „hier ist nichts".
+
+**ref** – ein Name, der auf eine oid zeigt. `refs/heads/main` ist ein Branch, `refs/tags/v1` ist ein Tag. Ein Branch ist eine Datei mit einem SHA darin, mehr war er nie.
+
+**HEAD** – die ref, die sagt, welcher Branch der aktuelle ist.
+
+**Packfile** – ein Haufen Objekte, gepackt in eine Datei, von denen einige als Deltas gegen andere gespeichert sind. Das ist es, was tatsächlich über das Netzwerk geht. Es beginnt mit den ASCII-Bytes `PACK`.
+
+**Thin Pack** – ein Packfile mit Deltas, deren Basisobjekte absichtlich fehlen, weil der Sender weiß, dass der Empfänger sie bereits hat. Super für die Bandbreite, nervig für mich später.
+
+**pkt-line** – Gits Art, einen Stream in Nachrichten zu zerlegen. 4 Hex-Zeichen, die die Länge der Nachricht angeben, dann die Nachricht. Die Länge zählt diese 4 Zeichen mit.
+
+**Flush Packet** – die pkt-line `0000`. Sie bedeutet „dieser Abschnitt ist fertig".
+
+**Sideband** – eine Möglichkeit, Fortschrittsmeldungen und Fehler in denselben Stream wie die Pack-Daten zu multiplexen, damit Git „Counting objects" ausgeben kann, während es dir Bytes schickt.
+
+<style dangerouslySetInnerHTML={{ __html: `
+.gh-fig{border:1px solid rgba(255,255,255,.12);border-radius:.6rem;background:rgba(255,255,255,.02);padding:1.1rem 1rem .9rem;margin:2rem 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;line-height:1.35;overflow-x:auto}
+.gh-fig *{box-sizing:border-box}
+.gh-cap{margin-top:.85rem;font-size:.72rem;color:rgba(255,255,255,.45);font-family:inherit}
+.gh-node{border:1px solid rgba(255,255,255,.18);border-radius:.4rem;padding:.45rem .6rem;background:rgba(255,255,255,.04);white-space:nowrap}
+.gh-flow{display:flex;align-items:stretch;gap:1.4rem;min-width:720px}
+.gh-flow>.gh-node{align-self:center}
+.gh-wires{flex:1;display:flex;flex-direction:column;gap:1.6rem;padding:.4rem 0}
+.gh-wire{display:block}
+.gh-wire .gh-lbl{display:block;color:rgba(255,255,255,.62);white-space:nowrap;margin-bottom:.4rem}
+.gh-wire .gh-sub{display:block;color:rgba(255,255,255,.32);white-space:nowrap;margin-top:.45rem}
+.gh-line{position:relative;height:1px;background:rgba(255,255,255,.16)}
+.gh-dot{position:absolute;top:-3px;width:7px;height:7px;border-radius:50%;background:#7dd3fc;box-shadow:0 0 8px #7dd3fc;animation:gh-ltr 2.6s linear infinite}
+.gh-dot.back{background:#fbbf24;box-shadow:0 0 8px #fbbf24;animation-name:gh-rtl}
+@keyframes gh-ltr{from{left:0;opacity:0}10%{opacity:1}90%{opacity:1}to{left:100%;opacity:0}}
+@keyframes gh-rtl{from{left:100%;opacity:0}10%{opacity:1}90%{opacity:1}to{left:0;opacity:0}}
+.gh-pkt{display:flex;min-width:560px;align-items:stretch;gap:.35rem;padding:.3rem 0}
+.gh-seg{border:1px solid rgba(255,255,255,.18);border-radius:.3rem;padding:.6rem .8rem;text-align:center}
+.gh-seg small{display:block;margin-top:.3rem;font-size:.66rem;color:rgba(255,255,255,.4)}
+.gh-seg.len{background:rgba(125,211,252,.12);border-color:rgba(125,211,252,.45);color:#7dd3fc}
+.gh-seg.flush{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.4);color:#fbbf24}
+.gh-steps{display:flex;flex-direction:column;gap:.4rem;min-width:520px}
+.gh-step{display:flex;gap:.7rem;align-items:center;padding:.45rem .6rem;border:1px solid rgba(255,255,255,.1);border-radius:.35rem;animation:gh-sweep 6s ease-in-out infinite}
+.gh-step .n{color:rgba(255,255,255,.35);width:1.1rem}
+.gh-step.commit{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.07);color:#6ee7b7}
+@keyframes gh-sweep{0%,100%{background:rgba(255,255,255,.01)}8%,16%{background:rgba(255,255,255,.07)}}
+.gh-cols{display:flex;gap:1.6rem;min-width:640px;position:relative;align-items:flex-start}
+.gh-col{flex:1;border:1px solid rgba(255,255,255,.14);border-radius:.45rem;padding:.6rem}
+.gh-col h4{margin:0 0 .5rem;font-size:.72rem;color:rgba(255,255,255,.55);font-weight:400;font-family:inherit}
+.gh-layer{padding:.25rem .45rem;border:1px solid rgba(255,255,255,.12);border-radius:.3rem;margin-bottom:.3rem;background:rgba(255,255,255,.03)}
+.gh-layer.new{border-color:rgba(125,211,252,.45);color:#7dd3fc}
+.gh-borrow{align-self:center;text-align:center;color:rgba(255,255,255,.45);padding:0 .4rem;white-space:nowrap}
+.gh-borrow .arrow{display:block;height:1px;width:5rem;margin:.35rem auto;background:repeating-linear-gradient(90deg,rgba(125,211,252,.8) 0 6px,transparent 6px 12px);animation:gh-march .8s linear infinite}
+@keyframes gh-march{to{background-position:12px 0}}
+.gh-bar{display:flex;gap:.35rem;min-width:520px;margin-bottom:.5rem}
+.gh-cell{flex:1;text-align:center;padding:.45rem 0;border:1px solid rgba(255,255,255,.14);border-radius:.3rem;background:rgba(255,255,255,.03)}
+.gh-cell.missing{border-style:dashed;color:rgba(255,255,255,.3)}
+.gh-cell.filling{animation:gh-fill 3.2s ease-in-out infinite}
+.gh-cell.d1{animation-delay:.5s}.gh-cell.d2{animation-delay:1s}.gh-cell.d3{animation-delay:1.5s}
+@keyframes gh-fill{0%,20%{border-style:dashed;color:rgba(255,255,255,.3);background:rgba(255,255,255,.02)}45%,100%{border-style:solid;color:#7dd3fc;border-color:rgba(125,211,252,.45);background:rgba(125,211,252,.08)}}
+@media (prefers-reduced-motion:reduce){.gh-fig *{animation:none !important}}
+` }} />
+
+### Funktionsweise des Smart Protocol
+
+Das Smart Protocol hängt an 3 HTTP-Routen.
+- `/info/refs?service=`
+- `/git-upload-pack`
+- `/git-receive-pack`
+
+
+
+### `/info/refs?service=`
+Git schickt einen GET-Request an diese Route, um zu prüfen, ob die Refs im lokalen Store von Git dieselben sind wie auf dem Server. Sind sie gleich, zeigt Git die Meldung `Already up to date`.
+
+Der Service ist dabei der spannende Teil. Er kann entweder sein:
+- `git-upload-pack`, der Client will etwas von dir holen (clone, fetch, pull)
+- `git-receive-pack`, der Client will dir etwas geben (push)
+
+Nur diese zwei. Wenn in diesem Query-Parameter etwas anderes steht, stochert jemand an deinem Server herum, also wirf dort einen Fehler.
+
+Die Antwort ist kein JSON. Git spricht in pkt-lines, die ich oben erklärt habe, der Body sieht also so aus:
+
+```
+001e# service=git-upload-pack\n
+0000
+<was auch immer git ausgibt>
+```
+
+`001e` ist Hex für 30, und die Zeile ist 30 Bytes lang, inklusive dieser 4 Zeichen. Danach ein Flush Packet, um den Abschnitt zu schließen.
+
+
+  <div className="gh-pkt text-sm">
+    <div className="gh-seg len">001e<small>Länge, hex, zählt sich selbst mit</small></div>
+    <div className="gh-seg" style={{ flex: 1 }}># service=git-upload-pack\n<small>26 Bytes Payload</small></div>
+    <div className="gh-seg flush">0000<small>flush, Abschnitt vorbei</small></div>
+  </div>
+  <div className="gh-cap">0x1e ist 30. 4 + 26 = 30. Das ist das ganze Framing-Format.</div>
+
+Der Teil `<was auch immer git ausgibt>` ist die Ref-Advertisement, also die Liste jeder Ref, die du hast, samt der oid, auf die sie zeigt. Diese Liste habe ich nicht geschrieben. Git schreibt sie:
+
+```ts
+output.write(packetLine(`# service=${service}\n`));
+output.write(FLUSH_PACKET);
+
+const child = spawn('git', [binary, '--stateless-rpc', '--advertise-refs', repoDirectory]); 
+//                          ^binary here could either be upload-pack or receive-pack
+child.stdout.pipe(output);
+```
+
+`--advertise-refs` sorgt dafür, dass Git die Liste ausgibt und sich beendet, statt darauf zu warten, dass der Client etwas zurücksagt.
+
+Eine Sache, auf die man achten muss: Der Content-Type muss `application/x-git-upload-pack-advertisement` sein. Ist er falsch, nimmt Git an, du bist ein Dumb Server, und fängt an, Dateien bei dir anzufragen, die du nicht hast – und der Fehler, den du zurückbekommst, sagt dir überhaupt nichts Nützliches.
+
+### `/git-upload-pack`
+
+Das ist ein Clone oder ein Fetch. Der Client schickt einen Body voller `want <oid>`-Zeilen für Dinge, die er haben will, und `have <oid>`-Zeilen für Dinge, die er schon hat. Git ermittelt die Differenz und schickt ein Packfile zurück.
+
+Davon habe ich nichts implementiert. `git upload-pack --stateless-rpc <repo>` spawnen, den Request-Body in stdin pipen, stdout zurück in die Response pipen:
+
+```ts
+this.packProcess.streamUploadPack({ repoDirectory, input: body.open() });
+```
+
+`--stateless-rpc` ist hier wichtig. Normalerweise erwartet `upload-pack` einen offenen Socket, über den es ein paar Mal mit dem Client hin und her gehen kann. Über HTTP ist jeder Request ein einzelner Schuss, dieses Flag lässt Git also eine einzige Runde machen und sich dann beenden.
+
+### `/git-receive-pack`
+
+Das ist ein Push, und es ist die einzige Route, bei der ich den Body tatsächlich lese, statt ihn nur weiterzureichen, weil ich hier erfahre, was der Client ändern will.
+
+Der Body:
+
+```
+<pkt-line> "<old-oid> <new-oid> <ref>\0<capabilities>"
+<pkt-line> "<old-oid> <new-oid> <ref>"
+0000
+PACK....
+```
+
+Diese ersten Zeilen sind der Command-Abschnitt. Eine Zeile pro Ref, die aktualisiert wird, mit der Aussage „ich glaube, `refs/heads/main` steht gerade auf `old-oid` und ich will sie auf `new-oid`". Danach ein Flush Packet, dann das Packfile.
+
+Zwei Dinge will ich hier hervorheben, weil beide mir später das Leben leichter gemacht haben.
+
+Erstens ist diese `old-oid` ein Compare-and-Swap, und Git hat die Schwerarbeit für mich erledigt. Wenn meine gespeicherte Ref nicht dazu passt, ist der Push ein Non-Fast-Forward und ich lehne ihn ab. Nichts davon musste ich erfinden, es kommt mit dem Protokoll.
+
+Zweitens: Wenn `new-oid` nur aus Nullen besteht, löscht der Client den Branch. Gleiche Route, gleiches Format, du lässt die Ref einfach fallen.
+
+Nachdem ich die Commands gelesen und mir gemerkt habe, was ich brauche, geht der ganze Body in `git receive-pack --stateless-rpc` und Git schreibt die Objekte auf die Platte. Also nein, ich habe keinen Packfile-Parser geschrieben. Bitte schreib keinen Packfile-Parser.
+
+## Was ist ein Git-Host also
+
+3 HTTP-Routen, 4 Hex-Ziffern Framing und `spawn('git')`. Das ist der Transport, komplett. Das UI, Pull Requests, Sterne, dieser kleine Sprachen-Farbbalken – all das ist eine ganz normale Web-App, die neben einem Ordner voller Bare-Repos sitzt.
+
+Was in Ordnung ist, bis dir einfällt, dass „ein Ordner voller Bare-Repos" nur funktioniert, wenn du einen Server hast und der nie stirbt. Da ist der Rest der Arbeit hingegangen.
+
+## Schreib zuerst die nutzlose Version
+
+Vor dem ganzen Storage-Kram: Hier ist ein Git-Host. Rund 40 Zeilen, keine Datenbank, kein Auth, kein S3 – und du kannst sofort davon clonen und dorthin pushen.
+
+```js
+import express from "express";
+import { spawn } from "node:child_process";
+import path from "node:path";
+import fs from "node:fs";
+
+const app = express();
+const ROOT = "/tmp/ghost";
+
+function repoDir(req) {
+  const { user, repo } = req.params;
+  const dir = path.join(ROOT, user, repo.replace(/\.git$/, "") + ".git");
+  if (!fs.existsSync(dir)) spawn("git", ["init", "--bare", dir]);
+  return dir;
+}
+
+const pkt = (line) =>
+  (Buffer.byteLength(line) + 4).toString(16).padStart(4, "0") + line;
+
+app.get("/:user/:repo/info/refs", (req, res) => {
+  const service = req.query.service;
+  if (service !== "git-upload-pack" && service !== "git-receive-pack") {
+    return res.sendStatus(403);
+  }
+
+  res.setHeader("Content-Type", `application/x-${service}-advertisement`);
+  res.setHeader("Cache-Control", "no-cache");
+  res.write(pkt(`# service=${service}\n`));
+  res.write("0000");
+
+  const git = spawn("git", [
+    service.replace("git-", ""),
+    "--stateless-rpc",
+    "--advertise-refs",
+    repoDir(req),
+  ]);
+  git.stdout.pipe(res);
+});
+
+for (const service of ["git-upload-pack", "git-receive-pack"]) {
+  app.post(`/:user/:repo/${service}`, (req, res) => {
+    res.setHeader("Content-Type", `application/x-${service}-result`);
+    res.setHeader("Cache-Control", "no-cache");
+
+    const git = spawn("git", [
+      service.replace("git-", ""),
+      "--stateless-rpc",
+      repoDir(req),
+    ]);
+    req.pipe(git.stdin);
+    git.stdout.pipe(res);
+  });
+}
+
+app.listen(3001);
+```
+
+Dann:
+
+```sh
+git clone http://localhost:3001/me/test.git
+cd test && echo hi > readme.md && git add . && git commit -m "hi"
+git push origin main
+```
+
+Wenn es so einfach ist, worum geht es im Rest dieses Posts? Um alles, was diese Version stillschweigend falsch macht:
+
+- Jeder kann in jedes Repo pushen. Es gibt überhaupt kein Auth.
+- Die Repos existieren nur im `/tmp` dieser einen Maschine. Starte die Kiste neu und sie sind vielleicht weg.
+- Wer gewinnt, wenn zwei Leute gleichzeitig pushen, entscheidet der Git-Prozess, der zuerst an der Ref-Datei ist.
+- Es gibt keine Möglichkeit, irgendetwas davon im Browser zu sehen.
+- Push etwas über 1 MiB und es bricht ab, aus einem Grund, für den ich peinlich lange gebraucht habe.
+
+Jeder Abschnitt danach ist ich beim Beheben eines dieser Punkte.
+
+## Auth, und warum Git erst herausgefordert werden muss
+
+Git kennt keine Cookies. Es spricht HTTP Basic, und nur der Server antwortet anfangs mit 401.
+
+Der Ablauf ist also: Git fragt nach etwas, mein Server antwortet mit `401` und einem `WWW-Authenticate: Basic realm="Ghost"`-Header, und erst dann schaut Git im Credential Helper nach oder fragt nach Benutzername und Passwort. Gebe ich einen 401 ohne diesen Header zurück, scheitert Git einfach und der Nutzer wird nie nach etwas gefragt, was so aussieht, als wäre mein Server kaputt.
+
+Das Passwort ist nicht das Account-Passwort. Es ist ein Personal Access Token, erzeugt in den Account-Einstellungen, genau wie GitHub es macht. Der Benutzername wird komplett ignoriert. Ich habe die [API Keys](https://better-auth.com/docs/plugins/api-key) von better-auth dafür genutzt, aber du kannst alles Mögliche verwenden.
+
+```ts
+const header = req.headers.authorization;
+if (!header?.startsWith('Basic ')) return null;
+
+// username is ignored, the password is the key, and a key can contain ":"
+const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+const key = decoded.slice(decoded.indexOf(':') + 1);
+
+const { valid, key: apiKey } = await this.auth.api.verifyApiKey({ body: { key } });
+return valid && apiKey ? { userId: apiKey.referenceId } : null;
+```
+
+Noch 2 Dinge
+
+**Lesen und Schreiben werden entschieden, bevor irgendetwas läuft.** Ein Clone eines öffentlichen Repos braucht kein Auth. Ein Push immer. Git fragt die Receive-Pack-Advertisement an, *bevor* es irgendetwas hochlädt, die Prüfung ist also:
+
+```ts
+const isPush =
+  req.path.endsWith('/git-receive-pack') ||
+  req.query.service === 'git-receive-pack';
+```
+Wir weisen einen Nutzer bei `info/refs` ab statt während des eigentlichen Pushes, nachdem er seine kostbaren CPU-Zyklen und sein RAM fürs Komprimieren verbraten hat (ist heutzutage teuer, weißt schon).
+
+Und das alles läuft in Middleware, bevor der Body irgendwohin gespoolt wird, ein abgelehnter Push berührt meine Platte also nie (Platten sind heutzutage auch teuer).
+
+## Jetzt der eigentliche Bau
+
+Ghost ist ein Turborepo. Next.js im Frontend, NestJS für die API, Postgres mit Drizzle und ein S3-Bucket. Überall Bun. Alle Entscheidungen sind in `docs/` im Repo festgehalten. Unten ein paar der wichtigsten Entscheidungen, die ich getroffen habe:
+
+### Git bekommt die Root, REST landet unter `/api`
+
+`/:username/:repo/info/refs` matcht fast jede URL, die dir einfällt. Ich hatte sie neben `/repositories` registriert, und eine Zeit lang lief das, bis mir auffiel, dass die Reihenfolge der Modul-Imports in `AppModule` entscheidet, welche gewinnt. Das fängt niemand im Review, und es bricht an dem Tag, an dem jemand die Imports ohne Grund umsortiert (ich schaue dich an, Biome).
+
+Also ist es jetzt `app.setGlobalPrefix('/api')`, wobei die Git-Routen vom Prefix ausgenommen sind. Alles REST sitzt unter `/api` und die Root gehört Git. Dieselbe Aufteilung, die GitHub mit `api.github.com` und `github.com/user/repo.git` macht.
+
+Die andere Option war, Git unter `/git/:username/:repo` auszuliefern, was funktioniert und was ich nicht wollte, denn dann hat jede Clone-URL, die ich je herausgebe, ein `/git` drin. Leute kopieren die in READMEs. Meine soll `host/user/repo.git` lauten.
+
+
+### HTTP aus dem `GitService` heraushalten
+
+`GitService` nimmt Streams entgegen und gibt `{ headers, body }` zurück. Der Controller ist die einzige Datei, die weiß, dass HTTP im Spiel ist.
+
+Dafür gab es ein paar Gründe:
+1. Ich will `GitService` wiederverwenden, wenn ich SSH implementiere.
+2. Trennung der Zuständigkeiten, einfach damit der Code vernünftig bleibt und die mentale Last sinkt.
+
+### S3 ist die Wahrheit, die Platte ist ein Cache
+
+Das ist die Entscheidung, an der der Rest hängt, und ehrlich gesagt lag ein Teil davon an meiner Hardware.
+
+Ich entwickle das auf einem Mac mini mit 256 GB SSD. Ich kann darauf keinen Haufen Test-Repos halten, und ich kann definitiv kein 7-GB-Repo clonen, um zu sehen, was mein Server damit macht. Wenn die Platte der Ort ist, an dem die Daten leben, dann ist die Größe meines Laptops die Größe meines Produkts, und das ist eine dumme Lage.
+
+Die andere Hälfte ist der normale Grund. Ein Bare-Repo auf lokaler Platte überlebt keinen Crash, überlebt keinen Maschinentausch und funktioniert überhaupt nicht, sobald es mehr als einen Server gibt. Eine Kiste, die ein Repo nie gesehen hat, muss es trotzdem ausliefern können.
+
+Der echte Zustand eines Repos ist also ein Write-Ahead-Log in S3:
+
+```
+repos/<repoId>/index                  das einzige veränderliche Objekt
+repos/<repoId>/entries/<ulid>.pack    unveränderlich, Header + Packfile-Bytes
+```
+
+Und die Bare-Repos auf der Platte sind nur ein Cache. Sie liegen in `os.tmpdir()`, auf meiner Maschine also `/tmp/ghost/<repoId>.git`, adressiert über die Zeilen-ID des Repos und nicht über `username/repo`, damit das Umbenennen von einem der beiden nichts verwaist. `/tmp` ist Absicht. Wenn das OS es leert oder ich es mit `rm -rf` lösche, weil mir wieder der Platz ausgeht, ist nichts verloren. Es wird beim nächsten Request aus dem Log neu gebaut.
+
+### Ein Push wird an genau einer Zeile real
+
+
+<div className="gh-fig">
+  <div className="gh-steps">
+    <div className="gh-step" style={{ animationDelay: '0s' }}><span className="n">1</span> Command-Abschnitt parsen, Ref-Übergänge holen</div>
+    <div className="gh-step" style={{ animationDelay: '.5s' }}><span className="n">2</span> PUT entries/&lt;ulid&gt;.pack, ungeschützt, wiederholbar</div>
+    <div className="gh-step" style={{ animationDelay: '1s' }}><span className="n">3</span> GET index, ETag behalten</div>
+    <div className="gh-step" style={{ animationDelay: '1.5s' }}><span className="n">4</span> jede oldOid muss zur Ref in diesem Index passen</div>
+    <div className="gh-step commit" style={{ animationDelay: '2s' }}><span className="n">5</span> PUT index mit If-Match, das ist der Push</div>
+    <div className="gh-step" style={{ animationDelay: '2.5s' }}><span className="n">6</span> git in den Cache schreiben lassen, Client antworten</div>
+  </div>
+  <div className="gh-cap">Stirb bei 1 bis 4 und nichts ist passiert. Stirb bei 6 und der Push ist schon real. Nur Zeile 5 entscheidet.</div>
+</div>
+
+
+Der Grund, warum ich das machen kann, ist, dass ein Push zwei Dinge trägt, die nichts gemeinsam haben.
+
+Die Objekte sind nach ihrem eigenen Hash benannt. Push denselben Blob zweimal und der zweite landet auf einer identischen Datei, es ist also egal, ob ich ihn zweimal hochlade, und es ist egal, ob ich ihn hochlade und der Push dann stirbt. Schlimmstenfalls liegen ein paar Bytes im Bucket, auf die niemand zeigt. Niemand kann sie sehen, kein Clone wird je nach ihnen fragen, sie kosten mich nur Speicher.
+
+Die Refs sind das Gegenteil. `refs/heads/main` ist ein Wert, den alle lesen, wenn also zwei Leute ihn gleichzeitig bewegen, muss einer verlieren.
+
+Ich lade also das große langsame Ding völlig ungeschützt hoch, und dann ist der winzige 200-Byte-Index-Write die einzige Stelle, an der ich vorsichtig sein muss. Die Schritte 1 bis 4 können wiederholt, unterbrochen oder weggeworfen werden, und das Repo merkt es nicht. Stirbt der Prozess bei Schritt 5, ist das Repo exakt so, wie es vor dem Push war.
+
+Gratis-Bonus: Ein Push, der 5 Branches berührt, ist ein einziger Index-Write, also alles oder nichts. Lokales Git braucht `--atomic`, um dir das zu geben.
+
+S3-Fallstricke, die ich ziemlich spät gelernt habe:
+
+- Behandle den Statuscode 409 von S3 nicht als Fehlschlag. `ConditionalRequestConflict` heißt nur, dass zwei bedingte Writes gerannt sind und der mit dem Fehler verloren hat, also nochmal versuchen.
+- `IfNoneMatch: '*'` beim allerersten Push. Sonst können zwei Pushes in ein brandneues Repo beide „hier ist kein Index" sehen und beide fröhlich einen schreiben.
+
+
+### Was passiert, wenn 2 Leute gleichzeitig pushen
+
+Nichts Cleveres. Sie rennen und einer verliert.
+
+Beide lesen `seq = 5`, beide bauen einen Index, der 6 sagt, beide schicken ihn mit `If-Match` auf dem ETag, das sie gelesen haben. S3 nimmt den ersten und lehnt den zweiten ab. Der Verlierer liest den Index nochmal, sieht, dass 6 belegt ist, und geht als 7 nochmal los. `seq` kann nie zweimal vergeben werden, weil das Anfragen und das Veröffentlichen derselbe Request sind.
+
+Wo ich Mist gebaut habe, war, die Validierung einmal vor dieser Schleife zu machen. Das fühlte sich richtig an, bis ich darüber nachdachte, wer das Rennen eigentlich verloren hat:
+
+Wenn der Gewinner `develop` gepusht hat und ich `main` pushe, ist mein Push weiterhin völlig gültig. `main` ist da, wo ich es gelassen habe. Ich brauche nur eine andere seq, also versuche ich es erneut und lande auf 7.
+
+Wenn der Gewinner auch `main` gepusht hat, dann ist das `main`, gegen das ich geprüft habe, weg. Meine `oldOid` passt nicht mehr. Das ist ein echter Non-Fast-Forward, und ihn 8-mal zu wiederholen verschwendet nur allen die Zeit.
+
+Die Prüfung muss also bei jedem Versuch erneut laufen, gegen den Index, den ich gerade neu gelesen habe. Läuft sie nur einmal, bekommen zwei Leute, die innerhalb derselben Sekunde auf denselben Branch pushen, beide eine 200, und einer der Commits verschwindet stillschweigend. Das ist kein Bug, den du durch Herumklicken findest.
+
+Dann gibt es noch den nervigen Fall. Ein PUT läuft in einen Timeout und ich habe keine Ahnung, ob es angekommen ist. Wenn ich es wiederhole, passt `oldOid` nicht mehr, und ich würde jemandem sagen, sein Push sei abgelehnt worden, obwohl er durchging – eine großartige Methode, um das Vertrauen in einen Git-Host zu verlieren. Die ULID des Eintrags ist deshalb zugleich ein Idempotenz-Schlüssel. Bevor ich irgendetwas melde, prüfe ich, ob der Index meine ULID bereits listet, und wenn ja, war das ich, der Push ist drin.
+
+### Warum das Log binär ist und nicht JSON
+
+Ich habe ein Binärformat von Hand gebaut. Big Endian, Magic-Prefix, Versions-Byte. Mir ist bewusst, wie das klingt.
+
+Der Index wird bei jedem Push gelesen und jedes Mal, wenn ein Cache aufholt, er ist also das heißeste Ding im System. Der größte Teil seiner Größe sind Object IDs, und in JSON müssen die hex sein, also 40 Bytes für etwas, das in 20 passt, plus Anführungszeichen und Schlüsselnamen um jedes herum. Roh gespeichert halbiert das, und es gibt keinen Parse-Schritt.
+
+Entry-Header:
+
+```
+magic               u32   "GENT"
+version             u8
+headerLen           u32   the packfile starts at exactly this offset
+ulid                16 raw bytes
+createdAt           u64
+pushedBy            u16 length + utf8
+transitionCount     u32
+  refName           u16 length + utf8
+  oldOid            20 raw bytes
+  newOid            20 raw bytes
+<packfile bytes>
+```
+
+`headerLen` ganz vorne ist der Teil, den ich mag. Er bedeutet, dass ich mit `Range: bytes=0-65535` lesen kann, wer einen Eintrag gepusht hat und was er geändert hat, statt ein 500-MB-Packfile herunterzuladen, um das herauszufinden.
+
+Da sitzt außerdem ein `flags`-Byte, das nichts tut. Es ist für SHA-256. Git bewegt sich langsam weg von SHA-1, und falls das je bei mir ankommt, sind oids keine 20 Bytes mehr und jeder Leser muss wissen, welche Größe er vor sich hat. Mit dem Byte ist es ein Bit und ein Branch im Decoder. Ohne es müsste ich die Hash-Länge aus Feld-Offsets raten oder jeden Eintrag in jedem Repo neu schreiben. Es kostet 1 Byte pro Objekt, also habe ich es reingepackt und auf null gelassen.
+
+Dieselbe Begründung für `version`. Das Decodieren prüft es und wirft `WalCorruptError` bei allem, was es nicht kennt.
+
+### Der Index hält einen Snapshot, die Einträge halten den Diff
+
+Ich speichere beides, was redundant aussah, bis ich versuchte, eines davon wegzulassen.
+
+Der Snapshot beantwortet „wo ist `main` gerade" in einem einzigen GET, ohne Historie ablaufen zu müssen. Das ist jede Ref-Advertisement und jedes Cache-Aufholen, es muss also billig sein.
+
+Die Transitions beantworten „wo war `main` bei Push 37". Das ist Reflog, Audit und Wiederherstellen auf einen Zeitpunkt, nichts davon kann ein Snapshot dir geben.
+
+Behalte nur die Transitions und jeder Lesevorgang kostet dich die ganze Historie. Behalte nur den Snapshot und du hast den Grund gelöscht, aus dem du ein Log statt eines Ordners gebaut hast.
+
+### Den Cache aufholen lassen
+
+Vor jedem Lesen und jedem Push wird das gecachte Bare-Repo auf den Stand gebracht, den das Log angibt. Es merkt sich seinen Stand in einer Datei `ghost-wal-seq` im Repo-Verzeichnis.
+
+```
+Index lesen -> mit gecachter seq vergleichen -> jede fehlende Schicht der Reihe nach index-pack
+            -> Refs mit dem Snapshot abgleichen -> HEAD umbiegen -> gecachte seq schreiben
+```
+
+
+<div className="gh-fig">
+  <div className="gh-bar">
+    <div className="gh-cell">L1</div>
+    <div className="gh-cell">L2</div>
+    <div className="gh-cell missing filling">L3</div>
+    <div className="gh-cell missing filling d1">L4</div>
+    <div className="gh-cell missing filling d2">L5</div>
+  </div>
+  <div className="gh-cap">Cache sagt seq 2, Index sagt seq 5. index-pack L3, L4, L5 in dieser Reihenfolge, Refs mit dem Snapshot abgleichen, 5 in ghost-wal-seq schreiben. Nie rückwärts, nie parallel.</div>
+</div>
+
+Der Cache kann hinter dem Log sein und kann nie davor sein, was genau das ist, was mir das Committen vor dem Anfassen der Platte eingebracht hat. Das bewegt sich also immer nur vorwärts, und ich musste nie einen Undo-Pfad schreiben, was gut ist, denn Undo-Pfade sind die Stelle, an der ich den Bug untergebracht hätte.
+
+3 Dinge, die ich hier auf die harte Tour gelernt habe.
+
+Gepushte Packs sind thin. Der Client lässt Basisobjekte weg, von denen er weiß, dass der Server sie schon hat, und das in einen leeren Object Store abzuspielen scheitert schlicht. `git index-pack --fix-thin --stdin` füllt die Lücken aus dem, was schon im Repo ist, und die Schichten müssen strikt nacheinander rein, nie parallel, weil die Basisobjekte von Schicht *n* in den Schichten davor liegen.
+
+Refs werden abgeglichen, nicht abgespielt. Ich nehme den Index-Snapshot und wende ihn in einem einzigen `git update-ref --stdin`-Batch an, dann lösche ich jede Ref auf der Platte, die der Snapshot nicht hat. Transitions einzeln abzuspielen bringt dich für mehr Geld an denselben Ort, und es bricht, wenn der Cache auch nur leicht abgedriftet ist. Einen Snapshot anzuwenden funktioniert aus jedem Startzustand, ein veralteter Cache – oder einer, an dem ich von Hand herumgestochert habe – repariert sich also selbst.
+
+HEAD ist eine Falle. Wenn das `HEAD` eines Bare-Repos auf einen Branch zeigt, den es nicht gibt, bekommst du beim Clonen ein leeres Repo und überhaupt keinen Fehler. Das hat mich einen Abend gekostet. Nach dem Abgleich zeige ich HEAD also auf `main`, dann `master`, dann auf irgendeinen Branch, der tatsächlich da ist.
+
+## Das Repo im Browser zeigen
+
+Der Transport ist an diesem Punkt fertig, aber niemand kann etwas sehen. Dieser Teil hat mich überrascht, weil er die einfache Hälfte war: Git bringt Plumbing-Kommandos mit, die dafür gedacht sind, von Programmen gelesen zu werden und nicht von Menschen.
+
+Was auch immer die URL sagt in einen SHA auflösen:
+
+```
+git rev-parse --verify <ref>^{commit}
+```
+
+Ein Verzeichnis auflisten, nicht den ganzen Baum:
+
+```
+git ls-tree -z -l <ref>:<path>
+```
+
+`-z` liefert NUL-getrennte Records, damit Dateinamen mit Leerzeichen oder Zeilenumbrüchen dir nicht den Tag ruinieren, und `-l` fügt die Blob-Größe hinzu. Du bekommst Mode, Typ, oid, Größe und Namen pro Eintrag, und ein Mode von `040000` ist ein Verzeichnis. Das ist der ganze Dateibrowser.
+
+Eine Datei lesen:
+
+```
+git cat-file --batch-check      <- stdin: "<ref>:<path>"
+git cat-file blob <oid>
+```
+
+Ich mache `--batch-check` zuerst, weil es mir Typ und Größe nennt, ohne mir den Inhalt zu schicken, ich kann also ablehnen, ein 40-MB-Binary zu highlighten, bevor ich es lese. Und beachte: Die Revision geht über stdin rein, nicht über argv, weil ein Pfad, der mit `-` beginnt, in argv eine Option ist, die nur auf ihren Moment wartet.
+
+Commits sind `git log`, Diffs sind `git diff --numstat` plus `--name-status` für den Stat-Balken, und die Dateiinhalte für die Diff-Ansicht sind einfach `git diff` zwischen 2 SHAs.
+
+### Die eine Stelle, an der das langsam wurde
+
+Ein Verzeichnis-Listing auf GitHub zeigt den letzten Commit, der jede Zeile berührt hat. Der naheliegende Weg dafür ist ein `git log -1 -- <path>` pro Eintrag, ein Ordner mit 30 Dateien kostet also 30 `git log`-Aufrufe, von denen jeder die Historie abläuft. Bei einem Repo mit echter Historie ist das unbenutzbar langsam, und zwar pro Seitenaufruf.
+
+Also gibt es eine Tabelle:
+
+```
+repository_path_commit(repositoryId, ref, path, commitSha, committedAt, subject)
+```
+
+Jeder Pfad bekommt eine Zeile, und ebenso jedes übergeordnete Verzeichnis einer geänderten Datei, `src` trägt also den neuesten Commit unterhalb von `src/`. Ein Verzeichnis-Listing ist dann eine indizierte Query, gejoint gegen `ls-tree`, statt 30 Subprozesse. Der leere Pfad ist die Repo-Root, ihre Zeile ist also der Tip-Commit dieser Ref.
+
+Eine zweite Tabelle verfolgt, wie weit ich gelaufen bin:
+
+```
+repository_ref_index(repositoryId, ref, indexedCommitSha)
+```
+
+Wenn der gespeicherte SHA noch ein Vorfahre des aktuellen Tips ist, muss ich nur die neuen Commits ablaufen. Wenn nicht, hat jemand force-gepusht oder Objekte sind verschwunden, also werfe ich die Zeilen weg und baue neu. Diese Prüfung ist ein `git merge-base --is-ancestor` entfernt.
+
+Zeilen für gelöschte Dateien bleiben liegen, was nach einem Bug klingt und keiner ist, weil der Lesepfad gegen `ls-tree` joint. Wenn eine Datei nicht mehr im Baum ist, taucht sie nie auf, egal was die Tabelle sagt.
+
+### Der Rest des Datenmodells
+
+Nichts Exotisches, es ist einfach Postgres:
+
+- `user`, `session`, `organization`, `apiKey` kommen alle von better-auth. Ich habe Auth nicht von Grund auf geschrieben und du solltest es auch nicht.
+- `repository` mit `ownerId`, einer nullable `organizationId`, damit ein Repo einer Person oder einer Org gehören kann, `visibility` und `parentRepositoryId`, das auf das zeigt, wovon es geforkt wurde.
+- Unique Index auf `(ownerId, slug)`, wo die Org-ID null ist, und auf `(organizationId, slug)`, wo sie es nicht ist.
+- `pullRequest` speichert Base und Head als getrennte Repository-IDs, weil ein Fork-PR 2 Repos umspannt und ein normaler nicht.
+
+Die Repo-ID ist das, woran sich alles andere aufhängt, inklusive des S3-Logs und des Cache-Verzeichnisses. Nicht `username/repo`. Die erste Version nutzte den Pfad, und dann habe ich in der Entwicklung ein Repo umbenannt und zugesehen, wie es seine gesamte Historie vergaß, was 10 lustige Sekunden waren.
+
+## 3 Bugs, die das Ganze wert waren
+
+### 1. Lass nie einen Stream über ein `await` hinweg herumliegen
+
+Der Push-Pfad machte früher das hier:
+
+```ts
+const repoDirectory = await this.openCache({ username, repo }); // S3 + subprocesses
+const body = await readStream(input);                            // too late
+```
+
+Wenn niemand einen Request-Stream liest, ist alles weg, was ankommt, während du beschäftigt bist. Git schreibt seinen Command-Abschnitt in einem eigenen Socket-Write, der Chunk, den ich während dieses awaits verloren habe, waren also die Ref-Updates. Der Body begann dann beim Flush Packet dahinter, und mein Parser sagte „keine Ref-Update-Kommandos", was eine völlig zutreffende Fehlermeldung ist, die nirgendwo in die Nähe des eigentlichen Problems zeigt.
+
+Es zeigt sich nur, wenn das await langsam genug ist, es trat also gegen echtes S3 auf und kein einziges Mal in den Tests.
+
+Diese beiden Zeilen zu tauschen behebt das heutige Symptom und nicht die eigentliche Form des Bugs. In dem Moment, in dem ich einen asynchronen Guard hinzufüge (und Basic Auth für Git wird einer sein), liegt der Stream während des Guards wieder ungelesen herum, bevor mein Handler überhaupt läuft. Der Body wird jetzt also in Middleware geleert, die in Nest vor den Guards läuft. Nichts Asynchrones kann zwischen den Socket und das erste Lesen geraten.
+
+Ein Stream ist kein Wert, der da liegt und auf dich wartet. Er läuft bereits.
+
+### 2. Der leere POST ist eine Sonde, kein kaputter Push
+
+Der hier taucht erst oberhalb von 1 MiB auf, eine reizende Eigenschaft für einen Bug.
+
+Ein Push, der größer als `http.postBuffer` ist (standardmäßig 1 MiB), kann nicht gepuffert werden, Git schickt ihn also chunked. Ein chunked Request kann nicht zurückgespult werden, wenn Git also einen 401 bekommt, kann es den Body nicht mit angehängten Credentials wiederholen. Seine Antwort ist `probe_rpc()` in `remote-curl.c`, das zuerst einen Wegwerf-POST abfeuert, mit einem Body von exakt `0000` und `Content-Length: 4`, den Status prüft, dort Auth abhandelt und erst dann den echten Push streamt.
+
+Aus einem echten Push:
+
+```
+POST #1  bytes=4        content-length=4            head="0000"
+POST #2  bytes=2428943  transfer-encoding=chunked   head="00b600000000"
+```
+
+Ich habe diese Sonde mit einem 400 beantwortet, weil ein Body ohne Ref-Update-Kommandos offensichtlich kaputt ist. Also:
+
+```
+error: RPC failed; HTTP 400 curl 22 The requested URL returned error: 400
+send-pack: unexpected disconnect while reading sideband packet
+fatal: the remote end hung up unexpectedly
+```
+
+Meine Tests pushten ein 95-KB-Repo und ein 178-KB-Repo. Beide unter `postBuffer`, beide nutzten also `Content-Length` und keines sondierte je. Alles grün. Jedes echte Repo scheiterte jedes Mal.
+
+Der Fix sind 4 Zeilen. Wenn der ganze Body ein einzelnes Flush Packet ist, gib 200 mit leerem Body zurück und fass nichts an.
+
+### 3. `Hash.update` gibt bei 2 GiB auf
+
+Das Next.js-Repo gepusht. 2,25 GiB Packfile.
+
+```
+RangeError: data is too long
+    at Hash.update (node:internal/crypto/hash:144:22)
+    at PushTransactionService.commitPush (push-transaction.service.ts:46)
+  code: 'ERR_OUT_OF_RANGE'
+```
+
+Nodes nativer Hash wirft, wenn du ihm mehr als `INT_MAX` gibst, also 2.147.483.647 Bytes. Mein Pack hatte 2.415.919.104.
+
+`createHash('sha256').update(pack)` würde bei einem echten Repo nie funktionieren.
+
+Nur den Hash zu reparieren hätte den Crash eine Zeile nach unten verschoben, denn jedes Einzelne davon war dasselbe Problem:
+
+| Vorher | Jetzt |
+| --- | --- | 
+| `readStream(req)` in einen Buffer | in eine temporäre Datei gespoolt |
+| `createHash().update(pack)` | `pipeline(body.open(offset), hash)` |
+| `Buffer.concat([header, pack])` | ein async Generator |
+| `putObject({ Body: buffer })` | Stream + explizites `ContentLength` |
+| `readEntryPack()` -> Buffer | `openEntryPack()` -> Ranged-GET-Stream |
+
+Der Body ist jetzt ein `GitRequestBody`, also `{ size, open(start?) }`. Kein einfaches `Readable`, weil der Push-Pfad den Body zweimal braucht, einmal für den Command-Abschnitt und einmal, um `receive-pack` zu füttern, und das Log braucht das Packfile für sich, beginnend bei `packOffset`. Ein Single-Pass-Stream kann das nicht, und ich kann die Bytes auch nirgends halten. `open(start)` gibt mir so viele Durchläufe, wie ich will, an jedem Offset, und es weiß nichts von HTTP, Tests übergeben also `bufferBody(...)`, Produktion übergibt `fileBody(...)`, und nichts unterhalb des Controllers merkt den Unterschied.
+
+Der Test, der das absichert, streamt 2,15 GiB durch `commitPush` in etwa einer Sekunde.
+
+## Pull Requests, oder 2 Logs, die einander nicht sehen können
+
+Jedes Repo hat sein eigenes Log, adressiert über seine Zeilen-ID. Beim Forken werden die Schichten des Elternteils in den Keyspace des Forks kopiert und ein Index geschrieben, der sie benennt, und ab diesem Moment tauschen die beiden Logs nie wieder ein Byte aus. Getrennte Keyspaces, getrennte Sequenznummern, keiner kann den anderen lesen.
+
+Ein PR aus einem Fork ist also ein Diff zwischen 2 Commits, die in 2 verschiedenen Object Stores leben. Alices Log hat kein `B4`, Bobs Log hat kein `A1`, und `git merge-base B4 A1` scheitert auf jeder Seite für sich. Sogar `cat-file -t` auf den Tip der Gegenseite wirft nur einen Fehler.
+
+
+<div className="gh-fig">
+  <div className="gh-cols">
+    <div className="gh-col">
+      <h4>repos/repo_bob (Base)</h4>
+      <div className="gh-layer">L1</div>
+      <div className="gh-layer">L2</div>
+      <div className="gh-layer">L3</div>
+      <div className="gh-layer new">L4' &nbsp; main = B4</div>
+    </div>
+    <div className="gh-borrow">
+      Objekte
+      <span className="arrow" />
+      geliehen
+    </div>
+    <div className="gh-col">
+      <h4>repos/repo_alice (Fork)</h4>
+      <div className="gh-layer">L1</div>
+      <div className="gh-layer">L2</div>
+      <div className="gh-layer">L3</div>
+      <div className="gh-layer new">L4 &nbsp; feature = A1</div>
+    </div>
+  </div>
+  <div className="gh-cap">Dieselben ersten 3 Schichten, weil der Fork sie kopiert hat. Danach sprechen die Logs nie wieder miteinander, Bob hat also kein A1 und Alice kein B4. Die gestrichelte Linie ist GIT_ALTERNATE_OBJECT_DIRECTORIES und sie existiert für genau einen spawn.</div>
+</div>
+
+Was mich gerettet hat, sind **Alternates**, ein Git-Feature, das ich davor nie angefasst hatte.
+
+Normalerweise liest ein Repo Objekte aus seinem eigenen `objects`-Verzeichnis und sonst nirgendwo. Alternates erlauben dir, Git zu sagen: „schau auch in dieses andere Verzeichnis, wenn du hier etwas nicht findest". Es ist derselbe Mechanismus, den `git clone --shared` nutzt, damit ein lokaler Clone den Object Store nicht dupliziert. Du kannst es dauerhaft in `objects/info/alternates` im Repo setzen oder pro Kommando über eine Umgebungsvariable, und genau das mache ich:
+
+```
+GIT_DIR=/tmp/ghost/repo_bob.git
+GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/ghost/repo_alice.git/objects
+
+git merge-base B4 A1        -> B3
+git diff --numstat B3 A1
+git log B3..A1
+git merge-tree --write-tree B4 A1
+```
+
+Jetzt läuft Git in Bobs Repo, aber wenn es nach `A1` sucht und es nicht findet, schaut es in Alices Object-Verzeichnis und findet es dort. `merge-base` funktioniert also, der Diff funktioniert, `log` funktioniert und der Merge funktioniert, ohne dass eines der Repos etwas über das andere erfährt.
+
+Die Umgebungsvariable ist die wichtige Hälfte. Sie in `objects/info/alternates` zu schreiben würde Bobs Repo dauerhaft von einem Verzeichnis abhängig machen, das einem Fork gehört, den er nicht kontrolliert, und wenn ich diesen Fork je lösche, fehlen Bobs Repo Objekte. Die Umgebungsvariable lebt für genau einen `spawn`, ein PR-Lesevorgang leiht sich die Objekte also für ein paar Millisekunden und danach ist die Verbindung weg.
+
+Nichts wird kopiert, nichts wird in eines der Repos geschrieben, und es gibt danach nichts aufzuräumen. Ein Pull Request in Ghost ist eine Datenbankzeile, die 2 `(repository, ref)`-Paare benennt, und hält überhaupt keinen Git-State. Kein `refs/pull/*`, kein Snapshot-Branch, keine kopierten Objekte. Er kann nicht von den Repos abdriften, die er beschreibt, weil da nichts ist, was abdriften könnte.
+
+Die naheliegende Alternative ist, zuerst aus dem anderen Cache-Verzeichnis zu fetchen, und die ist auf 3 Arten schlechter. Einen rohen SHA zu fetchen braucht `uploadpack.allowAnySHA1InWant` auf der Quelle. Stattdessen eine Ref zu fetchen kippt sie in `FETCH_HEAD`, was eine Datei pro Repo ist, 2 Leute, die gleichzeitig PRs öffnen, treten sich also gegenseitig auf die Füße. Und so oder so kopierst du Objekte, die ein Verzeichnis weiter schon existieren.
+
+Eine Scratch-Ref wie `refs/ghost/pr/*` ist noch schlechter, weil die Materialisierung jede Ref löscht, die der Snapshot nicht trägt. Sie überlebt also genau bis zum nächsten Push in dieses Repo. Läuft lokal super, stirbt unter Last.
+
+Das eine Ding, das du hier nicht falsch machen darfst, ist das Packen des Merge-Commits. Wenn beide Tips im selben Log liegen, ist es richtig, beide auszuschließen. Mach dasselbe über einen Fork hinweg, schließe `A1` aus, weil hey, ich sehe es doch direkt da, und du schreibst einen Eintrag, der nur den Merge-Commit enthält. Bobs Log ist dann für immer kaputt, denn jeder Server, der es abspielt, bekommt einen Merge-Commit, dessen zweiter Elternteil nicht da ist, und `--fix-thin` kann nicht helfen, weil es lokal nichts gibt, um das Pack zu vervollständigen.
+
+Die Ausschlussliste ist also das, was das Ziel-Log bereits hat. Nicht das, was mein Prozess in diesem Moment zufällig sehen kann.
+
+Außerdem beendet sich `git merge-tree --write-tree` mit 1, sowohl bei einem Konflikt als auch bei einem Commit, das es nicht lesen kann. Du unterscheidest sie über stderr: Ein Konflikt lässt es leer, ein unlesbares Commit schreibt `not something we can merge`. Behandle jeden Exit-Code 1 als Konflikt, und ein Fork, dessen Objekte nie verliehen wurden, meldet Konflikte statt zu scheitern – und dieser Bug sieht dann aus wie eine Produktentscheidung statt wie ein Bug.
+
+## Was nicht gebaut ist
+
+Das ist eine technische Nachbildung, also steck keine echten Daten hinein. Die Lücken:
+
+**SSH.** Alles oben ist HTTP. SSH ist ein anderer Transport für dieselben 3 Verben und ich habe es nicht gemacht.
+
+**Garbage Collection.** Einträge, die von einem Push hochgeladen wurden, der dann das CAS verloren hat, sind Waisen, auf die niemand verweist, der Speicher wächst also mit fehlgeschlagenen Pushes. Der Sweep ist allerdings leicht falsch zu machen. „Lösche Einträge, auf die kein Index verweist" löscht fröhlich einen Push, der gerade jetzt mitten im Upload ist. Er muss unreferenziert **und** älter als ein paar Stunden sein. Die ULID hat einen Zeitstempel drin, das Alter gibt es also gratis.
+
+**Kompaktierung.** Das ganze Log bei jedem Push zu lesen ist O(Historie). `compactedThroughSeq` steckt für ein Checkpoint-Schema im Format und ist derzeit immer 0.
+
+**Push-Fehler über das Sideband.** `NonFastForwardError` wird gerade als JSON gerendert, und Git-Clients mögen das nicht. Braucht einen pkt-line-Status-Encoder.
+
+**Webhooks, Issues, CI.** Nö.
+
+Der Code liegt auf [github.com/phantomknight287/ghost](https://github.com/phantomknight287/ghost). Er funktioniert. Steck trotzdem nichts hinein, das dir wichtig ist.

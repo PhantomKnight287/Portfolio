@@ -1,7 +1,7 @@
 import Transition from "@/components/transition";
 import { AiOutlineRight, AiOutlineMail } from "react-icons/ai";
-import { FiGithub } from "react-icons/fi";
-import { Projects } from "@/constants";
+import { FiGithub, FiExternalLink } from "react-icons/fi";
+import { Experiences, Projects } from "@/constants";
 import Badge from "@/components/badge";
 import {
   allEnglishWritings,
@@ -78,8 +78,26 @@ export default async function Home() {
   const t = await getTranslations();
   const locale = await getLocale();
 
+  const monthYear = new Intl.DateTimeFormat(locale, {
+    month: "long",
+    year: "numeric",
+  });
+
+  // "2024-06" parses as UTC midnight and can render as the previous month in
+  // negative-offset timezones, so build the date locally.
+  const parseMonth = (value: string) => {
+    const [year, month] = value.split("-").map(Number);
+    return new Date(year, (month ?? 1) - 1, 1);
+  };
+
+  const writings = [
+    ...(locale === "en" ? allEnglishWritings : allGermanWritings),
+  ]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 4);
+
   return (
-    <div className="flex mt-5 flex-col max-w-[720px] mx-auto p-5 lg:p-0">
+    <div className="flex mt-5 flex-col max-w-[600px] mx-auto p-5 lg:p-0">
       <div className="container">
         <h1 className="text-xl font-bold text-gray-400">
           <span className="">{t("HomePage.tagline")}</span>
@@ -132,7 +150,17 @@ export default async function Home() {
           <div className="flex flex-row items-center justify-start">
             <div className="aspect-square flex-none h-[10px] overflow-hidden relative w-2.5 will-change-transform bg-green-500 rounded-full"></div>
             <div className="flex flex-col justify-start shrink-0 opacity-100 ml-2 ">
-              <p className="text-white">Available for new opportunities</p>
+              <p className="text-white">
+                Available for new opportunities &middot;{" "}
+                <a
+                  href="https://drive.google.com/file/d/1YCyt6R_PS9A8LAalHj6ob7NqLY8X9hcq/view?usp=drive_link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-neutral-600 underline-offset-4 hover:decoration-neutral-300"
+                >
+                  {t("HomePage.resume")}
+                </a>
+              </p>
             </div>
           </div>
           <br />
@@ -162,51 +190,156 @@ export default async function Home() {
           </div>
         </div>
         <div className="w-full h-[1px] "></div>
-        <div className="mt-5">
-          <h1 className="text-2xl text-white mt-5">{t("Projects.title")}</h1>
-          <div className="flex flex-col">
+
+        {Experiences.length > 0 ? (
+          <section className="mt-10">
+            <h2 className="text-2xl text-white">{t("Experience.title")}</h2>
+            <div className="mt-4 flex flex-col">
+              {[...Experiences]
+                .map((exp) => (
+                  <details
+                    key={`${exp.company}-${exp.role}`}
+                    className="group border-b border-neutral-800 py-4 last:border-b-0"
+                  >
+                    <summary className="flex cursor-pointer list-none items-baseline gap-3 [&::-webkit-details-marker]:hidden">
+                      <AiOutlineRight className="mt-1 shrink-0 text-sm text-neutral-500 transition-transform group-open:rotate-90" />
+                      <span className="min-w-0 flex-1 text-neutral-100">
+                        {exp.role} <span className="text-neutral-500">at</span>{" "}
+                        {exp.company}
+                      </span>
+                      <span className="shrink-0 text-sm tabular-nums text-neutral-500">
+                        {monthYear.format(parseMonth(exp.start))} --{" "}
+                        {exp.end
+                          ? monthYear.format(parseMonth(exp.end))
+                          : t("Experience.present")}
+                      </span>
+                    </summary>
+                    <div className="mt-3 flex flex-col gap-3 pl-6">
+                      <ul className="flex list-disc flex-col gap-1 pl-4 text-sm text-neutral-500 marker:text-neutral-700">
+                        {exp.points.map((point) => (
+                          <li key={point} className="text-pretty">
+                            {point}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="flex flex-wrap gap-1.5">
+                        {exp.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded border border-neutral-800 bg-neutral-900 px-1.5 py-0.5 text-xs text-neutral-400"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      {exp.url ? (
+                        <a
+                          href={exp.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-neutral-500 underline decoration-neutral-700 underline-offset-4 hover:text-neutral-100"
+                        >
+                          {exp.company}
+                        </a>
+                      ) : null}
+                    </div>
+                  </details>
+                ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="mt-10">
+          <h2 className="text-2xl text-white">{t("Projects.title")}</h2>
+          <div className="mt-4 flex flex-col">
             {Projects.map((project) => (
-              <Link
-                className="proj group"
-                key={project.name.replace(" ", "-")}
-                href={`/projects/${project.slug}`}
+              <div
+                key={project.slug}
+                className="group flex flex-col gap-1 border-b border-neutral-800 py-4 last:border-b-0"
               >
-                <article className="flex flex-row gap-0 items-start justify-between lg:justify-start mt-1 mb-1 w-full overflow-hidden">
-                  <div className="flex flex-row gap-2 justify-start opacity-100 flex-none shrink-0 h-auto relative whitespace-pre w-auto mr-3">
-                    <h1 className="text-lg leading-[1.3em] text-left text-gray-300 group-hover:text-white inline-flex underline">
-                      {project.name}
-                    </h1>
-                    <p className="line-clamp-1 text-gray-400 max-w-full">
-                      {t(`Projects.${project.slug}.summary`)}
-                    </p>
-                  </div>
-                </article>
+                <div className="flex w-full items-baseline gap-3">
+                  <Link
+                    href={`/projects/${project.slug}`}
+                    className="min-w-0 flex-1 truncate text-neutral-100 underline-offset-4 group-hover:underline"
+                  >
+                    {project.name}
+                  </Link>
+                  <span className="flex shrink-0 items-center gap-2 text-neutral-500">
+                    {project.urls.githubUrl ? (
+                      <a
+                        href={project.urls.githubUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${project.name} source code`}
+                        className="hover:text-neutral-100"
+                      >
+                        <FiGithub />
+                      </a>
+                    ) : null}
+                    {project.urls.liveUrl ? (
+                      <a
+                        href={project.urls.liveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${project.name} live site`}
+                        className="hover:text-neutral-100"
+                      >
+                        <FiExternalLink />
+                      </a>
+                    ) : null}
+                  </span>
+                </div>
+                <p className="text-pretty text-sm text-neutral-500">
+                  {t(`Projects.${project.slug}.summary`)}
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {project.tags.slice(0, 5).map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded border border-neutral-800 bg-neutral-900 px-1.5 py-0.5 text-xs text-neutral-400"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-2xl text-white">{t("WritingsPage.title")}</h2>
+            <Link
+              href="/writings"
+              className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-100"
+            >
+              {t("HomePage.viewAll")}
+              <AiOutlineRight />
+            </Link>
+          </div>
+          <div className="mt-4 flex flex-col">
+            {writings.map((writing) => (
+              <Link
+                className="group flex flex-col gap-1 border-b border-neutral-800 py-4 last:border-b-0"
+                key={writing._meta.path}
+                href={`/writings/${writing._meta.path}`}
+              >
+                <span className="flex w-full items-baseline gap-3">
+                  <span className="min-w-0 flex-1 truncate text-neutral-100 underline-offset-4 group-hover:underline">
+                    {writing.title}
+                  </span>
+                  <span className="shrink-0 text-sm tabular-nums text-neutral-500">
+                    {monthYear.format(writing.date)}
+                  </span>
+                </span>
+                <span className="text-pretty text-sm text-neutral-500">
+                  {writing.summary}
+                </span>
               </Link>
             ))}
           </div>
-        </div>
-        <div className="mt-5">
-          <h1 className="text-2xl text-white mt-5 mb-0">Writings</h1>
-          <div className="flex flex-col">
-            {[...(locale === "en" ? allEnglishWritings : allGermanWritings)]
-              .sort((a, b) => b.date.getTime() - a.date.getTime())
-              .map((writing) => (
-                <Link
-                  className="proj group"
-                  key={writing._meta.path}
-                  href={`/writings/${writing._meta.path}`}
-                >
-                  <article className="flex flex-row gap-0 items-start justify-between lg:justify-start mt-1 mb-1 w-full overflow-hidden">
-                    <div className="flex flex-row gap-2 justify-start opacity-100 min-w-0 h-auto relative mr-3">
-                      <h1 className="text-lg leading-[1.3em] text-left text-gray-300 group-hover:text-white underline truncate">
-                        {writing.title}
-                      </h1>
-                    </div>
-                  </article>
-                </Link>
-              ))}
-          </div>
-        </div>
+        </section>
       </div>
     </div>
   );

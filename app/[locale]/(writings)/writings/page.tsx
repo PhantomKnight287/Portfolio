@@ -58,7 +58,7 @@ export default async function WritingsPage() {
 
   return (
     <div className="w-full px-5  pt-0 md:pt-16 pb-16 flex flex-col items-center justify-center">
-      <div className="w-full max-w-[720px]">
+      <div className="w-full max-w-[600px]">
         <div className="flex items-center justify-between gap-3 w-full">
           <Link
             href="/"
